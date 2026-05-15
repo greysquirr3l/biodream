@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-15
+
+### Added
+
+- **CLI**: `--version` now reports the git commit SHA and commit date
+  (e.g. `biopac 0.2.1 (git:abc12345 2026-05-15)`). Falls back to `crates.io`
+  when installed from the registry.
+
+### Fixed
+
+- **CLI**: `biopac` with no arguments now prints help instead of an error.
+  Unknown flags and subcommands exit 2 with a `--help` hint; parse errors are
+  handled explicitly via `try_parse()` rather than clap's internal exit.
+- **CI**: Silenced `cargo-deny` false-positive for `RUSTSEC-2024-0436`
+  (`paste` unmaintained); the crate is a transitive dependency via
+  `parquet` → `ahash` and is not directly actionable.
+
 ## [0.2.0] - 2026-05-15
 
 ### Fixed
