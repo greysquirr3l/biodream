@@ -72,14 +72,16 @@ fn csv_full_pipeline_via_read_bytes() -> Result<(), BiopacError> {
 
     let mut blob: Vec<u8> = Vec::new();
 
-    // Graph header (256 bytes)
-    blob.extend_from_slice(&38i32.to_le_bytes()); // lVersion
-    blob.extend_from_slice(&i16::try_from(channels).unwrap_or(0).to_le_bytes());
-    blob.extend_from_slice(&0i16.to_le_bytes()); // nPreampTypes
-    blob.extend_from_slice(&1.0f64.to_le_bytes()); // dSampleTime = 1ms → 1000 Hz
-    blob.extend(std::iter::repeat_n(0u8, 236));
-    blob.extend_from_slice(&i16::try_from(chan_hdr_len).unwrap_or(252).to_le_bytes());
-    blob.extend_from_slice(&[0u8; 2]);
+    // Graph header (256 bytes) — BIOPAC format layout
+    blob.extend_from_slice(&0i16.to_le_bytes());   // [0..2]  unused i16 = 0
+    blob.extend_from_slice(&38i32.to_le_bytes());  // [2..6]  lVersion = 38
+    blob.extend_from_slice(&256i32.to_le_bytes()); // [6..10] lExtItemHeaderLen = 256
+    blob.extend_from_slice(&i16::try_from(channels).unwrap_or(0).to_le_bytes()); // [10..12] nChannels
+    blob.extend_from_slice(&[0u8; 4]);             // [12..16] horiz/curr = 0
+    blob.extend_from_slice(&1.0f64.to_le_bytes()); // [16..24] dSampleTime = 1ms → 1000 Hz
+    blob.extend(std::iter::repeat_n(0u8, 228));    // [24..252] zeros
+    blob.extend_from_slice(&i16::try_from(chan_hdr_len).unwrap_or(252).to_le_bytes()); // [252..254]
+    blob.extend_from_slice(&[0u8; 2]);             // [254..256] pad
     assert_eq!(blob.len(), 256);
 
     // Channel headers

@@ -42,18 +42,31 @@ fn build_pre4_acq(channels: usize, samples_per_channel: usize) -> Vec<u8> {
     let mut buf: Vec<u8> = Vec::new();
 
     // -----------------------------------------------------------------------
-    // Graph header (256 bytes)
+    // Graph header (256 bytes) — BIOPAC format layout:
+    // [0..2]   nItemHeaderLen (unused i16)
+    // [2..6]   lVersion = 38 (Pre-4)
+    // [6..10]  lExtItemHeaderLen = 256
+    // [10..12] nChannels (i16 LE)
+    // [12..16] nHorizAxisType + nCurrChannel (zeros)
+    // [16..24] dSampleTime = 1.0 ms → 1000 Hz
+    // [24..252] zeros
+    // [252..254] nExtItemHeaderLen = 252 (per-channel, as i16 LE)
+    // [254..256] pad
     // -----------------------------------------------------------------------
-    // [0..4]   lVersion = 38 (Pre-4)
-    buf.extend_from_slice(&38i32.to_le_bytes());
-    // [4..6]   nChannels (i16 LE)
-    buf.extend_from_slice(&i16::try_from(channels).unwrap_or(0).to_le_bytes());
-    // [6..8]   nPreampTypes (skip)
+    // [0..2]   unused i16 = 0
     buf.extend_from_slice(&0i16.to_le_bytes());
-    // [8..16]  dSampleTime = 1.0 ms → 1000 Hz
+    // [2..6]   lVersion = 38 (Pre-4)
+    buf.extend_from_slice(&38i32.to_le_bytes());
+    // [6..10]  lExtItemHeaderLen = 256
+    buf.extend_from_slice(&256i32.to_le_bytes());
+    // [10..12] nChannels (i16 LE)
+    buf.extend_from_slice(&i16::try_from(channels).unwrap_or(0).to_le_bytes());
+    // [12..16] nHorizAxisType + nCurrChannel (zeros)
+    buf.extend_from_slice(&[0u8; 4]);
+    // [16..24]  dSampleTime = 1.0 ms → 1000 Hz
     buf.extend_from_slice(&1.0f64.to_le_bytes());
-    // [16..252] zeros (236 bytes)
-    buf.extend(std::iter::repeat_n(0u8, 236));
+    // [24..252] zeros (228 bytes)
+    buf.extend(std::iter::repeat_n(0u8, 228));
     // [252..254] nExtItemHeaderLen = 252 (as i16 LE)
     buf.extend_from_slice(&i16::try_from(chan_hdr_len).unwrap_or(252).to_le_bytes());
     // [254..256] pad

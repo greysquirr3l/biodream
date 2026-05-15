@@ -60,23 +60,32 @@ const GRAPH_HDR_MAX_RATE_MIN_LEN: i32 = 1944;
 // Byte-order detection
 // ---------------------------------------------------------------------------
 
-/// Read the first 4 bytes and infer the file's byte order from `lVersion`.
+/// Read the first 6 bytes and infer the file's byte order from `lVersion`.
+///
+/// The BIOPAC format begins with a 2-byte unused field (`nItemHeaderLen`) at
+/// offset 0, followed by `lVersion` as a 4-byte integer at offset 2. This
+/// function skips the prefix and checks the version bytes in both LE and BE
+/// order.
 ///
 /// Returns `(endian, revision)`. The stream is rewound to position 0 before
 /// returning so that the caller can re-read the full header.
 pub(super) fn detect_byte_order<R: Read + Seek>(
     reader: &mut R,
 ) -> Result<(Endian, i32), BiopacError> {
-    let mut buf = [0u8; 4];
+    let mut buf = [0u8; 6];
     reader.read_exact(&mut buf).map_err(BiopacError::Io)?;
     reader.seek(SeekFrom::Start(0)).map_err(BiopacError::Io)?;
 
-    let le = i32::from_le_bytes(buf);
+    // buf[0..2] = unused int16 (nItemHeaderLen) — discarded
+    // buf[2..6] = lVersion as int32
+    let ver_bytes = [buf[2], buf[3], buf[4], buf[5]];
+
+    let le = i32::from_le_bytes(ver_bytes);
     if (REVISION_MIN..=REVISION_MAX).contains(&le) {
         return Ok((Endian::Little, le));
     }
 
-    let be = i32::from_be_bytes(buf);
+    let be = i32::from_be_bytes(ver_bytes);
     if (REVISION_MIN..=REVISION_MAX).contains(&be) {
         return Ok((Endian::Big, be));
     }
@@ -94,31 +103,38 @@ pub(super) fn detect_byte_order<R: Read + Seek>(
 
 /// Fixed-layout 256-byte graph header for Pre-4 files (revision < 68).
 ///
-/// Field layout (App Note 156):
-/// | Offset | Type | Field              |
-/// |-------:|------|--------------------|  
-/// |      0 | i32  | `lVersion`         |
-/// |      4 | i16  | `nChannels`        |
-/// |      6 | i16  | `nPreampTypes` (skipped) |
-/// |      8 | f64  | `dSampleTime` (ms) |
-/// |  16-251| ---  | (skipped)          |
-/// |    252 | i16  | `nExtItemHeaderLen`|
-/// |    254 | ---  | (2-byte pad)       |
-/// Total: 4+2+2+8+236+2+2 = 256 bytes.
+/// Field layout (BIOPAC format; offsets from start of file):
+/// | Offset | Type | Field                   |
+/// |-------:|------|-------------------------|
+/// |      0 | i16  | unused (`nItemHeaderLen`)|
+/// |      2 | i32  | `lVersion`              |
+/// |      6 | i32  | `lExtItemHeaderLen` (=256, skipped) |
+/// |     10 | i16  | `nChannels`             |
+/// |     12 | i16  | `nHorizAxisType` (skipped) |
+/// |     14 | i16  | `nCurrChannel` (skipped)|
+/// |     16 | f64  | `dSampleTime` (ms)      |
+/// |  24-251| ---  | (skipped)               |
+/// |    252 | i16  | `nExtItemHeaderLen` (per-channel) |
+/// |    254 | ---  | (2-byte pad)            |
+/// Total: 2+4+4+2+4+8+228+2+2 = 256 bytes.
 #[binrw]
 #[derive(Debug, Copy, Clone)]
 pub(super) struct GraphHeaderPre4Raw {
-    /// `lVersion`: file format revision.
-    pub version: i32,
-    /// `nChannels`: number of channel headers that follow.
-    pub channels: i16,
-    /// Skip `nPreampTypes` (2 bytes at offset 6).
+    /// Skip 2-byte unused prefix (`nItemHeaderLen`) at offset 0.
     #[br(pad_before = 2)]
-    /// `dSampleTime`: sample period in milliseconds.
+    /// `lVersion`: file format revision (at offset 2).
+    pub version: i32,
+    /// Skip `lExtItemHeaderLen` (4 bytes at offset 6; always 256 for Pre-4).
+    #[br(pad_before = 4)]
+    /// `nChannels`: number of channel headers that follow (at offset 10).
+    pub channels: i16,
+    /// Skip `nHorizAxisType` and `nCurrChannel` (4 bytes at offsets 12–15).
+    #[br(pad_before = 4)]
+    /// `dSampleTime`: sample period in milliseconds (at offset 16).
     pub sample_time_ms: f64,
-    /// Skip offsets 16–251 (236 bytes).
-    #[br(pad_before = 236, pad_after = 2)]
-    /// `nExtItemHeaderLen`: byte length of each per-channel header.
+    /// Skip offsets 24–251 (228 bytes).
+    #[br(pad_before = 228, pad_after = 2)]
+    /// `nExtItemHeaderLen`: byte length of each per-channel header (at offset 252).
     pub chan_header_len: i16,
 }
 
@@ -137,8 +153,8 @@ pub(super) fn parse_graph_header_pre4(
     raw: GraphHeaderPre4Raw,
     endian: Endian,
 ) -> Result<Pre4Parsed, BiopacError> {
-    validate_channels(raw.channels, 0)?;
-    validate_sample_time(raw.sample_time_ms, 0)?;
+    validate_channels(raw.channels, 10)?;
+    validate_sample_time(raw.sample_time_ms, 16)?;
 
     let metadata = GraphMetadata {
         file_revision: FileRevision::new(raw.version),
@@ -164,14 +180,16 @@ pub(super) fn parse_graph_header_pre4(
 
 /// Variable-length graph header for Post-4 files (revision >= 68).
 ///
-/// Field layout:
+/// Field layout (BIOPAC format; offsets from start of file):
 /// | Offset | Type  | Field                    |
-/// |-------:|-------|--------------------------|
-/// |      0 | i32   | `lVersion`               |
-/// |      4 | i16   | `nChannels`              |
+/// |-------:|-------|---------------------------|
+/// |      0 | i16   | unused (`nItemHeaderLen`) |
+/// |      2 | i32   | `lVersion`               |
 /// |      6 | i32   | `lExtItemHeaderLen`      |
-/// |     10 | i16   | `lNumItems` (skipped)    |
-/// |     12 | f64   | `dSampleTime` (ms)       |
+/// |     10 | i16   | `nChannels`              |
+/// |     12 | i16   | `nHorizAxisType` (skipped)|
+/// |     14 | i16   | `nCurrChannel` (skipped) |
+/// |     16 | f64   | `dSampleTime` (ms)       |
 /// |    236 | [u8;40]| `szGraphTitle` (optional)|
 /// |    276 | i32×6 | `lSec..lYear` (optional) |
 /// |   1936 | u8    | `bCompressed` (optional) |
@@ -182,17 +200,19 @@ pub(super) fn parse_graph_header_pre4(
 #[binrw]
 #[derive(Debug, Copy, Clone)]
 pub(super) struct GraphHeaderPost4Raw {
-    /// `lVersion`: file format revision.
-    pub version: i32,
-    /// `nChannels`: number of channel headers that follow.
-    pub channels: i16,
-    /// `lExtItemHeaderLen`: total byte length of this graph header.
-    pub graph_header_len: i32,
-    /// Skip `lNumItems` (2 bytes at offset 10).
+    /// Skip 2-byte unused prefix (`nItemHeaderLen`) at offset 0.
     #[br(pad_before = 2)]
-    /// `dSampleTime`: sample period in milliseconds.
+    /// `lVersion`: file format revision (at offset 2).
+    pub version: i32,
+    /// `lExtItemHeaderLen`: total byte length of this graph header (at offset 6).
+    pub graph_header_len: i32,
+    /// `nChannels`: number of channel headers that follow (at offset 10).
+    pub channels: i16,
+    /// Skip `nHorizAxisType` and `nCurrChannel` (4 bytes at offsets 12–15).
+    #[br(pad_before = 4)]
+    /// `dSampleTime`: sample period in milliseconds (at offset 16).
     pub sample_time_ms: f64,
-    // Cursor is now at offset 20.
+    // Cursor is now at offset 24.
     /// `szGraphTitle`: 40-byte null-terminated ASCII title (offset 236).
     ///
     /// Present only when `lExtItemHeaderLen >= 276`.
@@ -260,8 +280,8 @@ pub(super) fn parse_graph_header_post4(
     raw: GraphHeaderPost4Raw,
     endian: Endian,
 ) -> Result<Post4Parsed, BiopacError> {
-    validate_channels(raw.channels, 4)?;
-    validate_sample_time(raw.sample_time_ms, 12)?;
+    validate_channels(raw.channels, 10)?;
+    validate_sample_time(raw.sample_time_ms, 16)?;
 
     if raw.graph_header_len < 20 {
         return Err(BiopacError::Parse(ParseError {
@@ -382,9 +402,9 @@ mod tests {
 
     #[test]
     fn detect_little_endian_revision_38() -> Result<(), Box<dyn std::error::Error>> {
-        // lVersion = 38 as LE i32 = [38, 0, 0, 0] + 252 padding bytes
+        // Unused i16 at offset 0, lVersion = 38 as LE i32 at offsets 2-5.
         let mut bytes = [0u8; 256];
-        bytes[0..4].copy_from_slice(&38i32.to_le_bytes());
+        bytes[2..6].copy_from_slice(&38i32.to_le_bytes());
         let mut cursor = Cursor::new(&bytes[..]);
         let (endian, version) = detect_byte_order(&mut cursor)?;
         assert_eq!(endian, Endian::Little);
@@ -396,11 +416,10 @@ mod tests {
 
     #[test]
     fn detect_big_endian_revision_68() -> Result<(), Box<dyn std::error::Error>> {
-        // lVersion = 68 as BE i32 = [0, 0, 0, 68]
+        // Unused i16 at offset 0, lVersion = 68 as BE i32 at offsets 2-5.
         let mut bytes = [0u8; 256];
-        bytes[0..4].copy_from_slice(&68i32.to_be_bytes());
-        // Make sure LE interpretation is out of range so BE wins.
-        // [0, 0, 0, 68] as LE i32 = 0x44000000 = 1140850688, out of [30, 200].
+        bytes[2..6].copy_from_slice(&68i32.to_be_bytes());
+        // [0, 0, 0, 68] as LE i32 = 0x44000000, out of [30, 200], so BE wins.
         let mut cursor = Cursor::new(&bytes[..]);
         let (endian, version) = detect_byte_order(&mut cursor)?;
         assert_eq!(endian, Endian::Big);
@@ -410,8 +429,8 @@ mod tests {
 
     #[test]
     fn detect_invalid_version_returns_error() {
-        // Neither LE nor BE interpretation is in [30, 200].
-        let bytes: [u8; 4] = [0x00, 0x00, 0x00, 0x00]; // both = 0
+        // 6 bytes: unused prefix = 0, version bytes = 0 — neither LE nor BE is in [30, 200].
+        let bytes = [0u8; 6];
         let mut cursor = Cursor::new(&bytes[..]);
         let result = detect_byte_order(&mut cursor);
         assert!(result.is_err());
@@ -419,7 +438,7 @@ mod tests {
 
     // ----- Pre-4 graph header -------------------------------------------
 
-    /// Build a minimal 256-byte Pre-4 graph header.
+    /// Build a minimal 256-byte Pre-4 graph header using the BIOPAC format.
     fn pre4_bytes(
         version: i32,
         channels: i16,
@@ -427,13 +446,15 @@ mod tests {
         chan_header_len: i16,
     ) -> [u8; 256] {
         let mut b = [0u8; 256];
-        b[0..4].copy_from_slice(&version.to_le_bytes());
-        b[4..6].copy_from_slice(&channels.to_le_bytes());
-        // nPreampTypes at 6 — leave as 0
-        b[8..16].copy_from_slice(&sample_time_ms.to_le_bytes());
-        // offsets 16–251 — leave as 0
-        b[252..254].copy_from_slice(&chan_header_len.to_le_bytes());
-        // 254–255 pad — 0
+        // offset 0-1: unused i16 = 0
+        b[2..6].copy_from_slice(&version.to_le_bytes());          // lVersion at offset 2
+        b[6..10].copy_from_slice(&256i32.to_le_bytes());           // lExtItemHeaderLen = 256 at offset 6
+        b[10..12].copy_from_slice(&channels.to_le_bytes());        // nChannels at offset 10
+        // offsets 12-15: nHorizAxisType, nCurrChannel = 0
+        b[16..24].copy_from_slice(&sample_time_ms.to_le_bytes());  // dSampleTime at offset 16
+        // offsets 24-251 = 0
+        b[252..254].copy_from_slice(&chan_header_len.to_le_bytes()); // nExtItemHeaderLen at offset 252
+        // 254-255 pad = 0
         b
     }
 
@@ -485,7 +506,7 @@ mod tests {
 
     // ----- Post-4 graph header ------------------------------------------
 
-    /// Build a minimal 40-byte Post-4 header (no compressed flag).
+    /// Build a minimal Post-4 header buffer using the BIOPAC format.
     #[expect(
         clippy::indexing_slicing,
         clippy::cast_sign_loss,
@@ -498,11 +519,12 @@ mod tests {
         sample_time_ms: f64,
     ) -> Vec<u8> {
         let mut b = vec![0u8; header_len.max(40) as usize];
-        b[0..4].copy_from_slice(&version.to_le_bytes());
-        b[4..6].copy_from_slice(&channels.to_le_bytes());
-        b[6..10].copy_from_slice(&header_len.to_le_bytes());
-        // lNumItems at 10 — leave as 0
-        b[12..20].copy_from_slice(&sample_time_ms.to_le_bytes());
+        // offset 0-1: unused i16 = 0
+        b[2..6].copy_from_slice(&version.to_le_bytes());       // lVersion at offset 2
+        b[6..10].copy_from_slice(&header_len.to_le_bytes());   // lExtItemHeaderLen at offset 6
+        b[10..12].copy_from_slice(&channels.to_le_bytes());    // nChannels at offset 10
+        // offsets 12-15: nHorizAxisType, nCurrChannel = 0
+        b[16..24].copy_from_slice(&sample_time_ms.to_le_bytes()); // dSampleTime at offset 16
         b
     }
 
@@ -536,11 +558,12 @@ mod tests {
         // Build a 1940-byte header with bCompressed = 1 at offset 1936.
         let header_len: i32 = 1940;
         let mut bytes = vec![0u8; header_len as usize];
-        bytes[0..4].copy_from_slice(&77i32.to_le_bytes()); // revision 77
-        bytes[4..6].copy_from_slice(&1i16.to_le_bytes()); // 1 channel
-        bytes[6..10].copy_from_slice(&header_len.to_le_bytes());
-        // lNumItems at 10 leave 0
-        bytes[12..20].copy_from_slice(&1.0f64.to_le_bytes()); // 1 ms -> 1000 Hz
+        // offset 0-1: unused i16 = 0
+        bytes[2..6].copy_from_slice(&77i32.to_le_bytes());        // revision 77 at offset 2
+        bytes[6..10].copy_from_slice(&header_len.to_le_bytes());  // lExtItemHeaderLen at offset 6
+        bytes[10..12].copy_from_slice(&1i16.to_le_bytes());       // 1 channel at offset 10
+        // offsets 12-15: horiz/curr = 0
+        bytes[16..24].copy_from_slice(&1.0f64.to_le_bytes());     // 1 ms -> 1000 Hz at offset 16
         bytes[1936] = 1; // bCompressed = true
 
         let mut cursor = Cursor::new(&bytes);
@@ -576,10 +599,11 @@ mod tests {
     fn post4_extracts_title_when_header_long_enough() -> Result<(), Box<dyn std::error::Error>> {
         let header_len: i32 = 300;
         let mut bytes = vec![0u8; header_len as usize];
-        bytes[0..4].copy_from_slice(&68i32.to_le_bytes()); // revision 68
-        bytes[4..6].copy_from_slice(&1i16.to_le_bytes());
-        bytes[6..10].copy_from_slice(&header_len.to_le_bytes());
-        bytes[12..20].copy_from_slice(&1.0f64.to_le_bytes());
+        // offset 0-1: unused i16 = 0
+        bytes[2..6].copy_from_slice(&68i32.to_le_bytes());        // revision 68 at offset 2
+        bytes[6..10].copy_from_slice(&header_len.to_le_bytes());  // lExtItemHeaderLen at offset 6
+        bytes[10..12].copy_from_slice(&1i16.to_le_bytes());       // 1 channel at offset 10
+        bytes[16..24].copy_from_slice(&1.0f64.to_le_bytes());     // dSampleTime at offset 16
         // Write "ECG Test" at offset 236.
         let title = b"ECG Test\0";
         bytes[236..236 + title.len()].copy_from_slice(title);
@@ -610,10 +634,10 @@ mod tests {
     fn post4_extracts_acquisition_datetime() -> Result<(), Box<dyn std::error::Error>> {
         let header_len: i32 = 300;
         let mut bytes = vec![0u8; header_len as usize];
-        bytes[0..4].copy_from_slice(&74i32.to_le_bytes());
-        bytes[4..6].copy_from_slice(&2i16.to_le_bytes());
+        bytes[2..6].copy_from_slice(&74i32.to_le_bytes());
         bytes[6..10].copy_from_slice(&header_len.to_le_bytes());
-        bytes[12..20].copy_from_slice(&1.0f64.to_le_bytes());
+        bytes[10..12].copy_from_slice(&2i16.to_le_bytes());
+        bytes[16..24].copy_from_slice(&1.0f64.to_le_bytes());
         // Write sec/min/hour/day/month/year at offset 276.
         let dt_fields: [i32; 6] = [30, 45, 9, 14, 3, 2008]; // lSec, lMin, lHour, lDay, lMonth, lYear
         for (i, &v) in dt_fields.iter().enumerate() {
@@ -655,10 +679,10 @@ mod tests {
     fn post4_extracts_max_samples_per_second() -> Result<(), Box<dyn std::error::Error>> {
         let header_len: i32 = 1944;
         let mut bytes = vec![0u8; header_len as usize];
-        bytes[0..4].copy_from_slice(&74i32.to_le_bytes());
-        bytes[4..6].copy_from_slice(&1i16.to_le_bytes());
+        bytes[2..6].copy_from_slice(&74i32.to_le_bytes());
         bytes[6..10].copy_from_slice(&header_len.to_le_bytes());
-        bytes[12..20].copy_from_slice(&1.0f64.to_le_bytes());
+        bytes[10..12].copy_from_slice(&1i16.to_le_bytes());
+        bytes[16..24].copy_from_slice(&1.0f64.to_le_bytes());
         let max_rate: i32 = 400_000;
         bytes[1940..1944].copy_from_slice(&max_rate.to_le_bytes());
 

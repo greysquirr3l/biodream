@@ -21,14 +21,16 @@ fn build_pre4_acq(channels: usize, samples_per_channel: usize) -> Vec<u8> {
     let chan_hdr_usize: usize = usize::try_from(chan_hdr_len).unwrap_or(252);
     let mut buf: Vec<u8> = Vec::new();
 
-    // Graph header (256 bytes)
-    buf.extend_from_slice(&38i32.to_le_bytes()); // lVersion = 38
-    buf.extend_from_slice(&i16::try_from(channels).unwrap_or(0).to_le_bytes());
-    buf.extend_from_slice(&0i16.to_le_bytes()); // nPreampTypes
-    buf.extend_from_slice(&1.0f64.to_le_bytes()); // dSampleTime = 1 ms
-    buf.extend(std::iter::repeat_n(0u8, 236)); // [16..252]
-    buf.extend_from_slice(&i16::try_from(chan_hdr_len).unwrap_or(252).to_le_bytes());
-    buf.extend_from_slice(&[0u8; 2]);
+    // Graph header (256 bytes) — BIOPAC format layout
+    buf.extend_from_slice(&0i16.to_le_bytes());   // [0..2]  unused i16 = 0
+    buf.extend_from_slice(&38i32.to_le_bytes());  // [2..6]  lVersion = 38
+    buf.extend_from_slice(&256i32.to_le_bytes()); // [6..10] lExtItemHeaderLen = 256
+    buf.extend_from_slice(&i16::try_from(channels).unwrap_or(0).to_le_bytes()); // [10..12] nChannels
+    buf.extend_from_slice(&[0u8; 4]);             // [12..16] horiz/curr = 0
+    buf.extend_from_slice(&1.0f64.to_le_bytes()); // [16..24] dSampleTime = 1 ms
+    buf.extend(std::iter::repeat_n(0u8, 228));    // [24..252] zeros
+    buf.extend_from_slice(&i16::try_from(chan_hdr_len).unwrap_or(252).to_le_bytes()); // [252..254]
+    buf.extend_from_slice(&[0u8; 2]);             // [254..256] pad
     assert_eq!(buf.len(), 256);
 
     // Per-channel headers (252 bytes each)

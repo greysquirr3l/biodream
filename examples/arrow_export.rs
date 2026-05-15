@@ -25,13 +25,10 @@ fn run() {
     use std::{env, fs::File, io::BufWriter, process};
 
     let args: Vec<String> = env::args().collect();
-    if args.len() < 3 {
+    let (Some(input), Some(output)) = (args.get(1), args.get(2)) else {
         eprintln!("Usage: arrow_export <input.acq> <output.arrow>");
         process::exit(1);
-    }
-
-    let input = &args[1];
-    let output = &args[2];
+    };
 
     let df = match biodream::read_file(input) {
         Ok(r) => {

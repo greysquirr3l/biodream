@@ -270,11 +270,12 @@ fn write_pre4_graph_header<W: Write>(
     let sample_time_ms = 1000.0_f64 / samples_per_second;
     let chan_hdr_len = i16::try_from(CHAN_HDR_LEN).unwrap_or(i16::MAX);
 
-    put_i32(&mut buf, 0, revision, le);
-    put_i16(&mut buf, 4, n_ch, le);
-    // offset 6: nPreampTypes = 0 (already zero)
-    put_f64(&mut buf, 8, sample_time_ms, le);
-    // offset 16–251: zeros (already zero)
+    put_i32(&mut buf, 2, revision, le); // lVersion (offset 2)
+    put_i32(&mut buf, 6, i32::try_from(PRE4_GRAPH_HDR_LEN).unwrap_or(i32::MAX), le); // lExtItemHeaderLen (offset 6, = 256)
+    put_i16(&mut buf, 10, n_ch, le); // nChannels (offset 10)
+    // offsets 12-15: nHorizAxisType, nCurrChannel = 0 (already zero)
+    put_f64(&mut buf, 16, sample_time_ms, le); // dSampleTime (offset 16)
+    // offsets 24-251: zeros (already zero)
     put_i16(&mut buf, 252, chan_hdr_len, le);
     // offset 254–255: zeros
 
@@ -299,11 +300,11 @@ fn write_post4_graph_header<W: Write>(
     let sample_time_ms = 1000.0_f64 / samples_per_second;
 
     // Always little-endian for compressed files.
-    put_i32(&mut buf, 0, revision, true); // lVersion
-    put_i16(&mut buf, 4, n_ch, true); // nChannels
-    put_i32(&mut buf, 6, graph_hdr_len, true); // lExtItemHeaderLen
-    // offset 10: lNumItems = 0 (already zero)
-    put_f64(&mut buf, 12, sample_time_ms, true); // dSampleTime
+    put_i32(&mut buf, 2, revision, true); // lVersion (offset 2)
+    put_i32(&mut buf, 6, graph_hdr_len, true); // lExtItemHeaderLen (offset 6)
+    put_i16(&mut buf, 10, n_ch, true); // nChannels (offset 10)
+    // offsets 12-15: nHorizAxisType, nCurrChannel = 0 (already zero)
+    put_f64(&mut buf, 16, sample_time_ms, true); // dSampleTime (offset 16)
     // offsets 20–1935: zeros
     if let Some(flag) = buf.get_mut(POST4_COMPRESSED_FLAG_OFFSET) {
         *flag = 1; // bCompressed = 1

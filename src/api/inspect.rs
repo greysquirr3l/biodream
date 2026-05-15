@@ -138,9 +138,12 @@ mod tests {
 
         // Graph header (256 bytes)
         let mut gh = [0u8; 256];
-        gh[0..4].copy_from_slice(&38i32.to_le_bytes()); // lVersion = 38
-        gh[4..6].copy_from_slice(&(n_channels as i16).to_le_bytes()); // nChannels
-        gh[8..16].copy_from_slice(&1.0f64.to_le_bytes()); // dSampleTime = 1ms
+        // offset 0-1: unused i16 = 0
+        gh[2..6].copy_from_slice(&38i32.to_le_bytes());               // lVersion = 38 at offset 2
+        gh[6..10].copy_from_slice(&256i32.to_le_bytes());             // lExtItemHeaderLen = 256 at offset 6
+        gh[10..12].copy_from_slice(&(n_channels as i16).to_le_bytes()); // nChannels at offset 10
+        // offsets 12-15: horiz/curr = 0
+        gh[16..24].copy_from_slice(&1.0f64.to_le_bytes());            // dSampleTime = 1ms at offset 16
         gh[252..254].copy_from_slice(&(chan_hdr_len as i16).to_le_bytes()); // nExtItemHeaderLen
         buf.extend_from_slice(&gh);
 

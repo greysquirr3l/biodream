@@ -10,13 +10,11 @@ use std::{env, process};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let path = match args.get(1) {
-        Some(p) => p.clone(),
-        None => {
-            eprintln!("Usage: read_file <path/to/recording.acq>");
-            process::exit(1);
-        }
+    let Some(path) = args.get(1) else {
+        eprintln!("Usage: read_file <path/to/recording.acq>");
+        process::exit(1);
     };
+    let path = path.clone();
 
     let result = match biodream::read_file(&path) {
         Ok(r) => r,
