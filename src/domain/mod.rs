@@ -14,4 +14,4 @@ pub use channel::{Channel, ChannelData, ChannelMetadata};
 pub use datafile::Datafile;
 pub use journal::Journal;
 pub use marker::{Marker, MarkerStyle, Timestamp};
-pub use metadata::{ByteOrder, FileRevision, GraphMetadata};
+pub use metadata::{AcquisitionDateTime, ByteOrder, FileRevision, GraphMetadata};

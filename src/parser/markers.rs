@@ -69,14 +69,12 @@ fn decode_text(bytes: &[u8]) -> String {
     let trimmed = bytes
         .iter()
         .position(|&b| b == 0)
-        .map_or(bytes, |pos| &bytes[..pos]);
+        .map_or(bytes, |pos| bytes.get(..pos).unwrap_or(bytes));
 
-    if let Ok(s) = core::str::from_utf8(trimmed) {
-        s.into()
-    } else {
-        // Latin-1 fallback: each byte maps directly to the Unicode code point.
-        trimmed.iter().map(|&b| char::from(b)).collect()
-    }
+    core::str::from_utf8(trimmed).map_or_else(
+        |_| trimmed.iter().map(|&b| char::from(b)).collect(),
+        Into::into,
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +185,8 @@ pub(crate) fn parse_markers_and_journal<R: Read + Seek>(
         // Track bytes consumed to know where the journal starts.
         #[expect(
             clippy::cast_possible_truncation,
-            reason = "text_len fits in i32 in practice (marker text is tiny)"
+            clippy::cast_possible_wrap,
+            reason = "text_len fits in i32 in practice (marker text is tiny); FIXED/TIMESTAMP constants also tiny"
         )]
         {
             bytes_consumed += MARKER_FIXED_BYTES as i32 + text_len as i32;
@@ -235,9 +234,8 @@ pub(crate) fn parse_markers_and_journal<R: Read + Seek>(
 
 fn parse_journal<R: Read>(reader: &mut R) -> Result<Option<Journal>, BiopacError> {
     // Journal length prefix
-    let len = match read_i32_le(reader) {
-        Ok(n) => n,
-        Err(_) => return Ok(None), // EOF before journal — fine
+    let Ok(len) = read_i32_le(reader) else {
+        return Ok(None); // EOF before journal — fine
     };
 
     if len <= 0 {
@@ -301,20 +299,35 @@ mod tests {
             // style is 4 bytes, padded with NUL
             let mut style_bytes = [0u8; 4];
             for (i, b) in style.bytes().take(4).enumerate() {
-                style_bytes[i] = b;
+                if let Some(slot) = style_bytes.get_mut(i) {
+                    *slot = b;
+                }
             }
             body.extend_from_slice(&style_bytes);
-            #[expect(clippy::cast_possible_truncation, reason = "test text is tiny")]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                reason = "test text is tiny"
+            )]
             body.extend_from_slice(&write_i32_le(text.len() as i32));
             body.extend_from_slice(text.as_bytes());
             if has_ts {
                 body.extend_from_slice(&write_i64_le(ts.unwrap_or(0)));
             }
         }
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            reason = "test body size is tiny"
+        )]
         let total = MARKER_HDR_BYTES + body.len() as i32;
         let mut out = Vec::<u8>::new();
         out.extend_from_slice(&write_i32_le(total));
-        #[expect(clippy::cast_possible_truncation, reason = "test marker count is tiny")]
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            reason = "test marker count is tiny"
+        )]
         out.extend_from_slice(&write_i32_le(markers.len() as i32));
         out.extend_from_slice(&body);
         out
@@ -324,6 +337,7 @@ mod tests {
         let mut out = Vec::<u8>::new();
         #[expect(
             clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
             reason = "test journal text is small"
         )]
         out.extend_from_slice(&write_i32_le(text.len() as i32));

@@ -92,8 +92,8 @@ pub(crate) fn read_compressed<R: Read + Seek>(
 
         if !is_pre4 {
             // Post-4 has an extra `lOffset` field we don't need; skip it.
-            let mut _skip = [0u8; COMP_HDR_POST4_EXTRA];
-            reader.read_exact(&mut _skip).map_err(BiopacError::Io)?;
+            let mut skip = [0u8; COMP_HDR_POST4_EXTRA];
+            reader.read_exact(&mut skip).map_err(BiopacError::Io)?;
         }
 
         // Validate lengths
@@ -101,7 +101,6 @@ pub(crate) fn read_compressed<R: Read + Seek>(
             return Err(BiopacError::Compression(CompressionError {
                 #[expect(
                     clippy::cast_possible_truncation,
-                    clippy::cast_sign_loss,
                     reason = "ch_idx is bounded by channel_count which fits u16 in valid .acq files"
                 )]
                 channel_index: ch_idx as u16,
@@ -128,7 +127,7 @@ pub(crate) fn read_compressed<R: Read + Seek>(
             decompress_channel(ch_idx, &compressed_buf, uncompressed_bytes, &mut warnings)?;
 
         // --- Decode samples (always little-endian) ---
-        let channel_data = decode_samples(ch_idx, sample_type, &raw_bytes, meta, &mut warnings)?;
+        let channel_data = decode_samples(ch_idx, sample_type, &raw_bytes, meta, &mut warnings);
 
         let point_count = channel_data.len();
         channels.push(Channel {
@@ -165,11 +164,6 @@ fn decompress_channel(
             // exhausted without reaching stream end.  This is non-fatal for
             // files that were written with an incorrect uncompressed length;
             // we keep whatever bytes were produced.
-            #[expect(
-                clippy::cast_possible_truncation,
-                clippy::cast_sign_loss,
-                reason = "ch_idx is bounded by channel_count which fits u16"
-            )]
             warnings.push(Warning::new(alloc::format!(
                 "channel {ch_idx}: decompression BufError \
                  (expected {expected_uncompressed} bytes)"
@@ -178,8 +172,7 @@ fn decompress_channel(
         Err(e) => {
             #[expect(
                 clippy::cast_possible_truncation,
-                clippy::cast_sign_loss,
-                reason = "ch_idx bounded by channel_count"
+                reason = "ch_idx bounded by channel_count which fits u16"
             )]
             return Err(BiopacError::Compression(CompressionError {
                 channel_index: ch_idx as u16,
@@ -210,11 +203,11 @@ fn decode_samples(
     raw: &[u8],
     meta: &crate::domain::ChannelMetadata,
     warnings: &mut Vec<Warning>,
-) -> Result<ChannelData, BiopacError> {
+) -> ChannelData {
     match sample_type {
         SampleType::I16 => {
             let byte_size = core::mem::size_of::<i16>();
-            if raw.len() % byte_size != 0 {
+            if !raw.len().is_multiple_of(byte_size) {
                 warnings.push(Warning::new(alloc::format!(
                     "channel {ch_idx}: decompressed byte count {} \
                      is not a multiple of i16 size; truncating",
@@ -228,15 +221,15 @@ fn decode_samples(
                 let arr: [u8; 2] = [*chunk.first().unwrap_or(&0), *chunk.get(1).unwrap_or(&0)];
                 samples.push(i16::from_le_bytes(arr));
             }
-            Ok(ChannelData::Scaled {
+            ChannelData::Scaled {
                 raw: samples,
                 scale: meta.amplitude_scale,
                 offset: meta.amplitude_offset,
-            })
+            }
         }
         SampleType::F64 => {
             let byte_size = core::mem::size_of::<f64>();
-            if raw.len() % byte_size != 0 {
+            if !raw.len().is_multiple_of(byte_size) {
                 warnings.push(Warning::new(alloc::format!(
                     "channel {ch_idx}: decompressed byte count {} \
                      is not a multiple of f64 size; truncating",
@@ -260,7 +253,7 @@ fn decode_samples(
                 ];
                 samples.push(f64::from_le_bytes(arr));
             }
-            Ok(ChannelData::Float(samples))
+            ChannelData::Float(samples)
         }
     }
 }
@@ -293,6 +286,10 @@ mod tests {
                 frequency_divider: 1,
                 amplitude_scale: 1.0,
                 amplitude_offset: 0.0,
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "test: channel index bounded by channel_count parameter"
+                )]
                 display_order: i as u16,
                 sample_count: 0,
             })
@@ -301,9 +298,16 @@ mod tests {
             graph_metadata: GraphMetadata {
                 file_revision: FileRevision::new(revision),
                 samples_per_second: 1000.0,
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "test: channel_count controlled by caller"
+                )]
                 channel_count: channel_count as u16,
                 byte_order: ByteOrder::LittleEndian,
                 compressed: true,
+                title: None,
+                acquisition_datetime: None,
+                max_samples_per_second: None,
             },
             channel_metadata: meta,
             foreign_data: vec![],
@@ -313,12 +317,17 @@ mod tests {
         }
     }
 
+    #[expect(clippy::expect_used, reason = "test helper: compress on known-valid data cannot fail")]
     fn compress_data(data: &[u8]) -> Vec<u8> {
         use flate2::{Compress, FlushCompress};
         let mut c = Compress::new(flate2::Compression::default(), true);
         let mut out = vec![0u8; data.len() * 2 + 64];
         c.compress(data, &mut out, FlushCompress::Finish)
             .expect("compress");
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "test: compressed output fits usize on all supported targets"
+        )]
         let n = c.total_out() as usize;
         out.truncate(n);
         out
@@ -327,7 +336,17 @@ mod tests {
     fn build_pre4_blob(uncompressed: &[u8]) -> Vec<u8> {
         let compressed = compress_data(uncompressed);
         let mut blob = Vec::new();
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            reason = "test: data sizes fit i32"
+        )]
         blob.extend_from_slice(&(uncompressed.len() as i32).to_le_bytes());
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            reason = "test: data sizes fit i32"
+        )]
         blob.extend_from_slice(&(compressed.len() as i32).to_le_bytes());
         blob.extend_from_slice(&compressed);
         blob
@@ -336,7 +355,17 @@ mod tests {
     fn build_post4_blob(uncompressed: &[u8]) -> Vec<u8> {
         let compressed = compress_data(uncompressed);
         let mut blob = Vec::new();
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            reason = "test: data sizes fit i32"
+        )]
         blob.extend_from_slice(&(uncompressed.len() as i32).to_le_bytes());
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            reason = "test: data sizes fit i32"
+        )]
         blob.extend_from_slice(&(compressed.len() as i32).to_le_bytes());
         blob.extend_from_slice(&0i32.to_le_bytes()); // lOffset placeholder
         blob.extend_from_slice(&compressed);
@@ -355,20 +384,22 @@ mod tests {
 
         assert_eq!(warnings.len(), 0);
         assert_eq!(channels.len(), 1);
-        if let ChannelData::Scaled { raw, scale, offset } = &channels[0].data {
-            assert_eq!(raw, &samples);
-            assert!((scale - 1.0).abs() < f64::EPSILON);
-            assert!((offset - 0.0).abs() < f64::EPSILON);
-        } else {
-            panic!("expected ChannelData::Scaled");
-        }
-        assert_eq!(channels[0].point_count, 4);
+        let Some(ch0) = channels.first() else {
+            return Err("no channel returned".into());
+        };
+        let ChannelData::Scaled { raw, scale, offset } = &ch0.data else {
+            return Err("expected ChannelData::Scaled".into());
+        };
+        assert_eq!(raw, &samples);
+        assert!((scale - 1.0).abs() < f64::EPSILON);
+        assert!((offset - 0.0).abs() < f64::EPSILON);
+        assert_eq!(ch0.point_count, 4);
         Ok(())
     }
 
     #[test]
     fn post4_f64_single_channel() -> Result<(), Box<dyn std::error::Error>> {
-        let samples: Vec<f64> = vec![1.0, 2.5, -3.14];
+        let samples: Vec<f64> = vec![1.0, 2.5, -3.2];
         let raw_bytes: Vec<u8> = samples.iter().flat_map(|&s| s.to_le_bytes()).collect();
         let blob = build_post4_blob(&raw_bytes);
 
@@ -378,13 +409,15 @@ mod tests {
 
         assert_eq!(warnings.len(), 0);
         assert_eq!(channels.len(), 1);
-        if let ChannelData::Float(floats) = &channels[0].data {
-            assert_eq!(floats.len(), 3);
-            for (a, b) in floats.iter().zip(samples.iter()) {
-                assert!((a - b).abs() < 1e-10);
-            }
-        } else {
-            panic!("expected ChannelData::Float");
+        let Some(ch0) = channels.first() else {
+            return Err("no channel returned".into());
+        };
+        let ChannelData::Float(floats) = &ch0.data else {
+            return Err("expected ChannelData::Float".into());
+        };
+        assert_eq!(floats.len(), 3);
+        for (a, b) in floats.iter().zip(samples.iter()) {
+            assert!((a - b).abs() < 1e-10);
         }
         Ok(())
     }
@@ -408,30 +441,40 @@ mod tests {
         assert_eq!(channels.len(), 2);
 
         // Ch0 — i16
-        assert_eq!(channels[0].point_count, 3);
-        if let ChannelData::Scaled { raw, .. } = &channels[0].data {
-            assert_eq!(raw, &i16_samples);
-        } else {
-            panic!("expected Scaled");
-        }
+        let Some(ch0) = channels.first() else {
+            return Err("expected channel 0".into());
+        };
+        assert_eq!(ch0.point_count, 3);
+        let ChannelData::Scaled { raw, .. } = &ch0.data else {
+            return Err("ch0: expected Scaled".into());
+        };
+        assert_eq!(raw, &i16_samples);
 
         // Ch1 — f64
-        assert_eq!(channels[1].point_count, 2);
-        if let ChannelData::Float(f) = &channels[1].data {
-            assert_eq!(f.len(), 2);
-        } else {
-            panic!("expected Float");
-        }
+        let Some(ch1) = channels.get(1) else {
+            return Err("expected channel 1".into());
+        };
+        assert_eq!(ch1.point_count, 2);
+        let ChannelData::Float(f) = &ch1.data else {
+            return Err("ch1: expected Float".into());
+        };
+        assert_eq!(f.len(), 2);
 
         Ok(())
     }
 
     #[test]
+    #[expect(clippy::panic, reason = "test: unreachable given the preceding is_err() assertion")]
     fn decompression_error_returns_compression_error() {
         // Feed garbage bytes as compressed data.
         let bad_data = vec![0xFFu8; 16];
         let mut blob = Vec::new();
         blob.extend_from_slice(&16i32.to_le_bytes()); // uncompressed len
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            reason = "test: bad_data is 16 bytes"
+        )]
         blob.extend_from_slice(&(bad_data.len() as i32).to_le_bytes()); // compressed len
         blob.extend_from_slice(&0i32.to_le_bytes()); // lOffset (post4)
         blob.extend_from_slice(&bad_data);
@@ -441,11 +484,10 @@ mod tests {
         let result = read_compressed(&mut cursor, &headers);
 
         assert!(result.is_err());
-        if let Err(BiopacError::Compression(e)) = result {
-            assert_eq!(e.channel_index, 0);
-        } else {
+        let Err(BiopacError::Compression(e)) = result else {
             panic!("expected CompressionError");
-        }
+        };
+        assert_eq!(e.channel_index, 0);
     }
 
     #[test]
@@ -473,6 +515,9 @@ mod tests {
                 channel_count: 1,
                 byte_order: ByteOrder::LittleEndian,
                 compressed: true,
+                title: None,
+                acquisition_datetime: None,
+                max_samples_per_second: None,
             },
             channel_metadata: meta,
             foreign_data: vec![],
@@ -483,13 +528,15 @@ mod tests {
 
         let mut cursor = Cursor::new(blob);
         let (channels, _) = read_compressed(&mut cursor, &headers)?;
-        if let ChannelData::Scaled { raw, scale, offset } = &channels[0].data {
-            assert_eq!(raw, &samples);
-            assert!((scale - 0.5).abs() < f64::EPSILON);
-            assert!((offset - 1.0).abs() < f64::EPSILON);
-        } else {
-            panic!("expected Scaled");
-        }
+        let Some(ch0) = channels.first() else {
+            return Err("no channel returned".into());
+        };
+        let ChannelData::Scaled { raw, scale, offset } = &ch0.data else {
+            return Err("expected Scaled".into());
+        };
+        assert_eq!(raw, &samples);
+        assert!((scale - 0.5).abs() < f64::EPSILON);
+        assert!((offset - 1.0).abs() < f64::EPSILON);
         Ok(())
     }
 }

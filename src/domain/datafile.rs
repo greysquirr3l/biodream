@@ -104,6 +104,9 @@ mod tests {
                 channel_count: 2,
                 byte_order: ByteOrder::LittleEndian,
                 compressed: false,
+                title: None,
+                acquisition_datetime: None,
+                max_samples_per_second: None,
             },
             channels: alloc::vec![
                 Channel {

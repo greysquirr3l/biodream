@@ -87,6 +87,14 @@ const CHUNK_BYTES: usize = 1 << 20; // 1 MiB
 /// entry in `headers.channel_metadata`.
 ///
 /// The reader must already be positioned at `headers.data_start_offset`.
+#[expect(
+    clippy::too_many_lines,
+    reason = "single-pass streaming read loop; splitting would obscure the read/demux/scale pipeline"
+)]
+#[expect(
+    clippy::similar_names,
+    reason = "names encode element type; shortening loses precision"
+)]
 pub(crate) fn read_interleaved<R: Read + Seek>(
     reader: &mut R,
     headers: &ParsedHeaders,
@@ -157,8 +165,8 @@ pub(crate) fn read_interleaved<R: Read + Seek>(
         // (Budget-based termination: stop when any channel with a budget reaches it.)
         let budget = budgets.get(ch_idx).copied().unwrap_or(0);
         let current_count = match sample_type {
-            SampleType::I16 => raw_i16.get(ch_idx).map(|v| v.len()).unwrap_or(0),
-            SampleType::F64 => raw_f64.get(ch_idx).map(|v| v.len()).unwrap_or(0),
+            SampleType::I16 => raw_i16.get(ch_idx).map_or(0, Vec::len),
+            SampleType::F64 => raw_f64.get(ch_idx).map_or(0, Vec::len),
         };
         if budget > 0 && current_count >= budget as usize {
             // This channel's budget is exhausted — stop reading.
@@ -171,17 +179,14 @@ pub(crate) fn read_interleaved<R: Read + Seek>(
         let mut eof_hit = false;
 
         for i in 0..byte_size {
-            match read_byte(&mut buf, &mut buf_pos, &mut buf_end)? {
-                Some(b) => {
-                    if let Some(slot) = sample_bytes.get_mut(i) {
-                        *slot = b;
-                    }
+            if let Some(b) = read_byte(&mut buf, &mut buf_pos, &mut buf_end)? {
+                if let Some(slot) = sample_bytes.get_mut(i) {
+                    *slot = b;
                 }
-                None => {
-                    // EOF mid-sample or mid-pattern — stop cleanly.
-                    eof_hit = true;
-                    break;
-                }
+            } else {
+                // EOF mid-sample or mid-pattern — stop cleanly.
+                eof_hit = true;
+                break;
             }
         }
 
@@ -252,6 +257,10 @@ pub(crate) fn read_interleaved<R: Read + Seek>(
     Ok((channels, headers.warnings.clone()))
 }
 
+#[expect(
+    clippy::similar_names,
+    reason = "names encode element type; shortening loses precision"
+)]
 fn build_channel_data(
     sample_type: SampleType,
     ch_idx: usize,
@@ -309,6 +318,9 @@ mod tests {
                 channel_count,
                 byte_order,
                 compressed: false,
+                title: None,
+                acquisition_datetime: None,
+                max_samples_per_second: None,
             },
             channel_metadata: meta,
             foreign_data: Vec::new(),
@@ -455,7 +467,7 @@ mod tests {
         bytes.extend_from_slice(&5i16.to_le_bytes()); // ch0[0]
         bytes.extend_from_slice(&9i16.to_le_bytes()); // ch1[0]
         bytes.extend_from_slice(&7i16.to_le_bytes()); // ch0[1]
-                                                      // EOF here — second cycle would be ch0[2], ch1[1], ch0[3] but truncated
+        // EOF here — second cycle would be ch0[2], ch1[1], ch0[3] but truncated
 
         let meta = vec![
             ch_meta("ch0", 1, 1.0, 0.0, 0), // 0 = unbounded

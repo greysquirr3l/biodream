@@ -21,7 +21,7 @@ use std::io::{Read, Seek, SeekFrom};
 use binrw::{Endian, binrw};
 
 use crate::{
-    domain::{ByteOrder, FileRevision, GraphMetadata},
+    domain::{AcquisitionDateTime, ByteOrder, FileRevision, GraphMetadata},
     error::{BiopacError, HeaderSection, ParseError, UnsupportedVersionError},
 };
 
@@ -40,6 +40,21 @@ const MAX_CHANNELS: i16 = 256;
 const COMPRESSED_FLAG_MIN_LEN: i32 = 1937;
 /// Byte offset of `bCompressed` within the Post-4 graph header.
 const COMPRESSED_FLAG_OFFSET: u64 = 1936;
+
+/// Byte offset of the graph title (`szGraphTitle`) within the Post-4 header.
+const GRAPH_TITLE_OFFSET: u64 = 236;
+/// Minimum header length to contain the title field (236 + 40 = 276).
+const GRAPH_HDR_TITLE_MIN_LEN: i32 = 276;
+
+/// Byte offset of the first date/time field (`lSec`) within the Post-4 header.
+const GRAPH_DATETIME_OFFSET: u64 = 276;
+/// Minimum header length to contain all six date/time fields (276 + 24 = 300).
+const GRAPH_HDR_DATETIME_MIN_LEN: i32 = 300;
+
+/// Byte offset of `lMaxAcqSamplesPerSec` (`AcqKnowledge` ≥ 4.2, revision ≥ 74).
+const GRAPH_MAX_RATE_OFFSET: u64 = 1940;
+/// Minimum header length to contain the max-rate field (1940 + 4 = 1944).
+const GRAPH_HDR_MAX_RATE_MIN_LEN: i32 = 1944;
 
 // ---------------------------------------------------------------------------
 // Byte-order detection
@@ -131,6 +146,9 @@ pub(super) fn parse_graph_header_pre4(
         channel_count: u16::try_from(raw.channels).unwrap_or(0),
         byte_order: endian_to_byte_order(endian),
         compressed: false, // Pre-4 files are never compressed
+        title: None,
+        acquisition_datetime: None,
+        max_samples_per_second: None,
     };
 
     Ok(Pre4Parsed {
@@ -154,7 +172,10 @@ pub(super) fn parse_graph_header_pre4(
 /// |      6 | i32   | `lExtItemHeaderLen`      |
 /// |     10 | i16   | `lNumItems` (skipped)    |
 /// |     12 | f64   | `dSampleTime` (ms)       |
+/// |    236 | [u8;40]| `szGraphTitle` (optional)|
+/// |    276 | i32×6 | `lSec..lYear` (optional) |
 /// |   1936 | u8    | `bCompressed` (optional) |
+/// |   1940 | i32   | `lMaxAcqSamplesPerSec` (optional, rev ≥ 74) |
 ///
 /// After this struct is read the caller **must** seek to `graph_header_len`
 /// (the value of `lExtItemHeaderLen`) to land at the first channel header.
@@ -171,8 +192,42 @@ pub(super) struct GraphHeaderPost4Raw {
     #[br(pad_before = 2)]
     /// `dSampleTime`: sample period in milliseconds.
     pub sample_time_ms: f64,
-    // Cursor is now at offset 20.  Jump to the compression flag if present.
-    /// `bCompressed`: non-zero when channel data is zlib-compressed.
+    // Cursor is now at offset 20.
+    /// `szGraphTitle`: 40-byte null-terminated ASCII title (offset 236).
+    ///
+    /// Present only when `lExtItemHeaderLen >= 276`.
+    #[br(
+        if(graph_header_len >= GRAPH_HDR_TITLE_MIN_LEN),
+        seek_before = SeekFrom::Start(GRAPH_TITLE_OFFSET)
+    )]
+    pub title: Option<[u8; 40]>,
+
+    /// `lSec`: acquisition seconds (offset 276).
+    ///
+    /// When present, offsets 276–299 hold six consecutive `i32` date/time
+    /// fields read sequentially without additional seeks.
+    #[br(
+        if(graph_header_len >= GRAPH_HDR_DATETIME_MIN_LEN),
+        seek_before = SeekFrom::Start(GRAPH_DATETIME_OFFSET)
+    )]
+    pub acq_sec: Option<i32>,
+    /// `lMin`: acquisition minutes (offset 280).
+    #[br(if(graph_header_len >= GRAPH_HDR_DATETIME_MIN_LEN))]
+    pub acq_min: Option<i32>,
+    /// `lHour`: acquisition hours (offset 284).
+    #[br(if(graph_header_len >= GRAPH_HDR_DATETIME_MIN_LEN))]
+    pub acq_hour: Option<i32>,
+    /// `lDay`: acquisition day (offset 288).
+    #[br(if(graph_header_len >= GRAPH_HDR_DATETIME_MIN_LEN))]
+    pub acq_day: Option<i32>,
+    /// `lMonth`: acquisition month (offset 292).
+    #[br(if(graph_header_len >= GRAPH_HDR_DATETIME_MIN_LEN))]
+    pub acq_month: Option<i32>,
+    /// `lYear`: acquisition year, full value e.g. 2023 (offset 296).
+    #[br(if(graph_header_len >= GRAPH_HDR_DATETIME_MIN_LEN))]
+    pub acq_year: Option<i32>,
+
+    /// `bCompressed`: non-zero when channel data is zlib-compressed (offset 1936).
     ///
     /// Only present when `graph_header_len >= 1937`.
     #[br(
@@ -180,6 +235,16 @@ pub(super) struct GraphHeaderPost4Raw {
         seek_before = SeekFrom::Start(COMPRESSED_FLAG_OFFSET)
     )]
     pub compressed: Option<u8>,
+
+    /// `lMaxAcqSamplesPerSec`: maximum hardware sample rate in Hz (offset 1940).
+    ///
+    /// Present only in `AcqKnowledge` ≥ 4.2 (revision ≥ 74) files where
+    /// `lExtItemHeaderLen >= 1944`.
+    #[br(
+        if(graph_header_len >= GRAPH_HDR_MAX_RATE_MIN_LEN),
+        seek_before = SeekFrom::Start(GRAPH_MAX_RATE_OFFSET)
+    )]
+    pub max_acq_samples_per_sec: Option<i32>,
 }
 
 /// Parse output for a Post-4 graph header.
@@ -214,12 +279,42 @@ pub(super) fn parse_graph_header_post4(
     )]
     let graph_header_len = raw.graph_header_len as u64;
 
+    let title = raw.title.map(|t| null_term_bytes_to_string(&t));
+
+    let acquisition_datetime = match (
+        raw.acq_year,
+        raw.acq_month,
+        raw.acq_day,
+        raw.acq_hour,
+        raw.acq_min,
+        raw.acq_sec,
+    ) {
+        (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) => {
+            Some(AcquisitionDateTime {
+                year,
+                month,
+                day,
+                hour,
+                minute,
+                second,
+            })
+        }
+        _ => None,
+    };
+
+    let max_samples_per_second = raw
+        .max_acq_samples_per_sec
+        .and_then(|n| u32::try_from(n).ok());
+
     let metadata = GraphMetadata {
         file_revision: FileRevision::new(raw.version),
         samples_per_second: 1000.0 / raw.sample_time_ms,
         channel_count: u16::try_from(raw.channels).unwrap_or(0),
         byte_order: endian_to_byte_order(endian),
         compressed,
+        title,
+        acquisition_datetime,
+        max_samples_per_second,
     };
 
     Ok(Post4Parsed {
@@ -231,6 +326,15 @@ pub(super) fn parse_graph_header_post4(
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
+
+/// Decode a fixed-size null-terminated byte array to a `String`.
+///
+/// Bytes after the first `\0` are discarded. Non-UTF-8 bytes are replaced
+/// with the Unicode replacement character.
+fn null_term_bytes_to_string(bytes: &[u8]) -> alloc::string::String {
+    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+    alloc::string::String::from_utf8_lossy(bytes.get(..end).unwrap_or(bytes)).into_owned()
+}
 
 const fn endian_to_byte_order(endian: Endian) -> ByteOrder {
     match endian {
@@ -459,5 +563,138 @@ mod tests {
         let parsed = parse_graph_header_post4(raw, Endian::Little)?;
         assert!(!parsed.metadata.compressed);
         Ok(())
+    }
+
+    // ----- New field extraction tests -----------------------------------
+
+    #[test]
+    #[expect(
+        clippy::indexing_slicing,
+        clippy::cast_sign_loss,
+        reason = "test: slices at known offsets within a 300-byte buffer"
+    )]
+    fn post4_extracts_title_when_header_long_enough() -> Result<(), Box<dyn std::error::Error>> {
+        let header_len: i32 = 300;
+        let mut bytes = vec![0u8; header_len as usize];
+        bytes[0..4].copy_from_slice(&68i32.to_le_bytes()); // revision 68
+        bytes[4..6].copy_from_slice(&1i16.to_le_bytes());
+        bytes[6..10].copy_from_slice(&header_len.to_le_bytes());
+        bytes[12..20].copy_from_slice(&1.0f64.to_le_bytes());
+        // Write "ECG Test" at offset 236.
+        let title = b"ECG Test\0";
+        bytes[236..236 + title.len()].copy_from_slice(title);
+
+        let mut cursor = Cursor::new(&bytes);
+        let raw = GraphHeaderPost4Raw::read_le(&mut cursor)?;
+        let parsed = parse_graph_header_post4(raw, Endian::Little)?;
+        assert_eq!(parsed.metadata.title.as_deref(), Some("ECG Test"));
+        Ok(())
+    }
+
+    #[test]
+    fn post4_title_is_none_for_short_header() -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = post4_bytes_short(68, 1, 40, 1.0); // header_len = 40 < 276
+        let mut cursor = Cursor::new(&bytes);
+        let raw = GraphHeaderPost4Raw::read_le(&mut cursor)?;
+        let parsed = parse_graph_header_post4(raw, Endian::Little)?;
+        assert!(parsed.metadata.title.is_none());
+        Ok(())
+    }
+
+    #[test]
+    #[expect(
+        clippy::indexing_slicing,
+        clippy::cast_sign_loss,
+        reason = "test: slices at known offsets within a 300-byte buffer"
+    )]
+    fn post4_extracts_acquisition_datetime() -> Result<(), Box<dyn std::error::Error>> {
+        let header_len: i32 = 300;
+        let mut bytes = vec![0u8; header_len as usize];
+        bytes[0..4].copy_from_slice(&74i32.to_le_bytes());
+        bytes[4..6].copy_from_slice(&2i16.to_le_bytes());
+        bytes[6..10].copy_from_slice(&header_len.to_le_bytes());
+        bytes[12..20].copy_from_slice(&1.0f64.to_le_bytes());
+        // Write sec/min/hour/day/month/year at offset 276.
+        let dt_fields: [i32; 6] = [30, 45, 9, 14, 3, 2008]; // lSec, lMin, lHour, lDay, lMonth, lYear
+        for (i, &v) in dt_fields.iter().enumerate() {
+            let offset = 276 + i * 4;
+            bytes[offset..offset + 4].copy_from_slice(&v.to_le_bytes());
+        }
+
+        let mut cursor = Cursor::new(&bytes);
+        let raw = GraphHeaderPost4Raw::read_le(&mut cursor)?;
+        let parsed = parse_graph_header_post4(raw, Endian::Little)?;
+
+        let dt = parsed.metadata.acquisition_datetime;
+        assert!(dt.is_some(), "expected datetime to be parsed");
+        assert_eq!(dt.map(|d| d.year), Some(2008));
+        assert_eq!(dt.map(|d| d.month), Some(3));
+        assert_eq!(dt.map(|d| d.day), Some(14));
+        assert_eq!(dt.map(|d| d.hour), Some(9));
+        assert_eq!(dt.map(|d| d.minute), Some(45));
+        assert_eq!(dt.map(|d| d.second), Some(30));
+        Ok(())
+    }
+
+    #[test]
+    fn post4_datetime_is_none_for_short_header() -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = post4_bytes_short(68, 1, 280, 1.0); // header_len = 280 < 300
+        let mut cursor = Cursor::new(&bytes);
+        let raw = GraphHeaderPost4Raw::read_le(&mut cursor)?;
+        let parsed = parse_graph_header_post4(raw, Endian::Little)?;
+        assert!(parsed.metadata.acquisition_datetime.is_none());
+        Ok(())
+    }
+
+    #[test]
+    #[expect(
+        clippy::indexing_slicing,
+        clippy::cast_sign_loss,
+        reason = "test: slices at known offsets within a 1944-byte buffer"
+    )]
+    fn post4_extracts_max_samples_per_second() -> Result<(), Box<dyn std::error::Error>> {
+        let header_len: i32 = 1944;
+        let mut bytes = vec![0u8; header_len as usize];
+        bytes[0..4].copy_from_slice(&74i32.to_le_bytes());
+        bytes[4..6].copy_from_slice(&1i16.to_le_bytes());
+        bytes[6..10].copy_from_slice(&header_len.to_le_bytes());
+        bytes[12..20].copy_from_slice(&1.0f64.to_le_bytes());
+        let max_rate: i32 = 400_000;
+        bytes[1940..1944].copy_from_slice(&max_rate.to_le_bytes());
+
+        let mut cursor = Cursor::new(&bytes);
+        let raw = GraphHeaderPost4Raw::read_le(&mut cursor)?;
+        let parsed = parse_graph_header_post4(raw, Endian::Little)?;
+        assert_eq!(parsed.metadata.max_samples_per_second, Some(400_000));
+        Ok(())
+    }
+
+    #[test]
+    fn post4_max_rate_is_none_for_short_header() -> Result<(), Box<dyn std::error::Error>> {
+        // header_len = 1940 < 1944
+        let bytes = post4_bytes_short(74, 1, 1940, 1.0);
+        let mut cursor = Cursor::new(&bytes);
+        let raw = GraphHeaderPost4Raw::read_le(&mut cursor)?;
+        let parsed = parse_graph_header_post4(raw, Endian::Little)?;
+        assert!(parsed.metadata.max_samples_per_second.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn null_term_bytes_to_string_strips_at_first_null() {
+        let input = *b"Hello\0garbage-bytes";
+        assert_eq!(null_term_bytes_to_string(&input), "Hello");
+    }
+
+    #[test]
+    fn null_term_bytes_to_string_all_null() {
+        let input = [0u8; 40];
+        assert_eq!(null_term_bytes_to_string(&input), "");
+    }
+
+    #[test]
+    fn null_term_bytes_to_string_no_null() {
+        let input = *b"ABCDE";
+        assert_eq!(null_term_bytes_to_string(&input), "ABCDE");
     }
 }
