@@ -9,6 +9,7 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 keywords = ["biopac", "acqknowledge", "physiology", "biosignals", "bioread"]
 categories = ["science", "parser-implementations", "encoding"]
+exclude = [".mcp.json", ".vscode/", ".github/", "deny.toml", "plan.toml", "docs/", "reference_projects/"]
 
 [lib]
 name = "biodream"
