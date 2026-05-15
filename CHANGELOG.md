@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-15
+
+### Fixed
+
+- **Parser**: corrected file-version offset — skips the unused `i16` prefix at
+  byte offset 0 that was being misread as part of the version field, fixing
+  version detection on all v30+ files.
+
+### Changed
+
+- **Security** (T16–T18): `deny.toml` hardened with stricter advisory, license,
+  and source policies; `cargo-deny` and `cargo-audit` added as scheduled CI
+  checks via `security.yml`.
+- **Style**: `rustfmt` formatting pass across the writer, inspect, and
+  `arrow_export` modules.
+
+### Added
+
+- **CI/CD pipeline**: complete GitHub Actions workflow suite —
+  - `ci.yml` extended with `fmt`, `docs` (RUSTDOCFLAGS=-D warnings), and
+    `msrv` (1.95.0) gates alongside the existing test and deny jobs.
+  - `auto-tag.yml`: creates an annotated semver tag after CI passes on a
+    `chore(release):` commit, using `cargo metadata` to read the version.
+  - `release.yml`: builds cross-platform `biopac` binaries (Linux x86-64,
+    macOS ARM/x86, Windows x86-64), publishes to crates.io, and creates a
+    GitHub Release with checksums. Guarded by a `verify-ci` polling step.
+  - `security.yml`: weekly secret scan (gitleaks), `cargo audit`, and
+    `cargo deny` on a schedule and on Cargo file changes.
+  - `dependabot-automerge.yml` + `dependabot.yml`: auto-merge patch/minor
+    Dependabot PRs for both Cargo and GitHub Actions ecosystems.
+- **Local secret scanning**: `gitleaks protect --staged` pre-commit hook.
+
 ## [0.1.0] - 2025-07-01
 
 ### Added
@@ -99,5 +131,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MSRV: Rust 1.95.0 (edition 2024, stable toolchain only).
 - Full Clippy `-W pedantic / nursery / cargo / perf` profile with zero warnings.
 
-[Unreleased]: https://github.com/greysquirr3l/biodream/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/greysquirr3l/biodream/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/greysquirr3l/biodream/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/greysquirr3l/biodream/releases/tag/v0.1.0
