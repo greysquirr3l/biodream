@@ -1,0 +1,18 @@
+[book]
+title = "biodream"
+description = "Zero-copy, streaming-capable toolkit for reading and writing BIOPAC AcqKnowledge (.acq) files"
+authors = ["biodream contributors"]
+language = "en"
+src = "src"
+
+[output.html]
+site-url = "/biodream/"
+git-repository-url = "https://github.com/greysquirr3l/biodream"
+edit-url-template = "https://github.com/greysquirr3l/biodream/edit/main/book/src/{path}"
+no-section-label = false
+additional-css = ["theme/custom.css"]
+
+[output.html.search]
+enable = true
+limit-results = 20
+teaser-word-count = 30

@@ -2,7 +2,11 @@
 .coraline/
 .vscode/
 docs/dev/
+docs/adr/
 reference_projects/
+
+# mdBook build output — CI deploys this; no need to commit it
+book/book/
 
 plan.toml
 tasks/

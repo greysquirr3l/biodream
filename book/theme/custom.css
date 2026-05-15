@@ -1,0 +1,21 @@
+/* biodream book — minimal theme overrides */
+
+:root {
+  --sidebar-width: 270px;
+}
+
+.content main {
+  max-width: 860px;
+}
+
+/* Tighten up wide tables in the format chapter */
+table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* Restore normal wrapping for prose tables */
+table td:last-child {
+  white-space: normal;
+}
