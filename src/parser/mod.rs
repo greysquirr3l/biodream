@@ -13,7 +13,7 @@ pub mod headers;
 #[cfg(feature = "read")]
 pub mod interleaved;
 
-// TODO(T06): implement marker and journal parser
+#[cfg(feature = "read")]
 pub mod markers;
 
 // TODO(T07): implement compressed channel reader
