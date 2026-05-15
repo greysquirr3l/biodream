@@ -65,7 +65,7 @@ serde = { version = "1.0", optional = true, features = ["derive"] }
 
 # Apache Arrow IPC export.
 arrow-array = { version = "54", optional = true }
-arrow-schema = { version = "54", optional = true }
+arrow-schema = { version = "58", optional = true }
 arrow-ipc = { version = "54", optional = true }
 
 # Parquet export.
