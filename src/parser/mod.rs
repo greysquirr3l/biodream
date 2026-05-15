@@ -16,7 +16,8 @@ pub mod interleaved;
 #[cfg(feature = "read")]
 pub mod markers;
 
-// TODO(T07): implement compressed channel reader
+// Per-channel zlib decompression (T07) — requires `read` (= `std` + flate2)
+#[cfg(feature = "read")]
 pub mod compressed;
 
 // High-level I/O API — only available with the `read` (= `std`) feature.

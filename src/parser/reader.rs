@@ -8,6 +8,7 @@ use std::vec::Vec;
 
 extern crate alloc;
 
+use super::compressed::read_compressed;
 use super::headers::parse_headers;
 use super::interleaved::read_interleaved;
 use super::markers::parse_markers_and_journal;
@@ -21,9 +22,11 @@ use crate::error::{BiopacError, ParseResult};
 pub fn read_stream<R: Read + Seek>(mut reader: R) -> Result<ParseResult<Datafile>, BiopacError> {
     let headers = parse_headers(&mut reader)?;
 
-    // TODO(T07): handle compressed files.
-    let (channels, mut warnings) = read_interleaved(&mut reader, &headers)?;
-
+    let (channels, mut warnings) = if headers.graph_metadata.compressed {
+        read_compressed(&mut reader, &headers)?
+    } else {
+        read_interleaved(&mut reader, &headers)?
+    };
     // Build channel display-order slice for marker channel mapping.
     let display_orders: Vec<u16> = headers
         .channel_metadata
@@ -32,8 +35,7 @@ pub fn read_stream<R: Read + Seek>(mut reader: R) -> Result<ParseResult<Datafile
         .collect();
 
     let file_revision = headers.graph_metadata.file_revision.0;
-    let markers_result =
-        parse_markers_and_journal(&mut reader, file_revision, &display_orders);
+    let markers_result = parse_markers_and_journal(&mut reader, file_revision, &display_orders);
 
     let (markers, journal) = match markers_result {
         Ok(mj) => {

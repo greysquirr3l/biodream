@@ -116,10 +116,7 @@ pub(crate) fn parse_markers_and_journal<R: Read + Seek>(
         )));
     }
 
-    #[expect(
-        clippy::cast_sign_loss,
-        reason = "num_markers checked >= 0 above"
-    )]
+    #[expect(clippy::cast_sign_loss, reason = "num_markers checked >= 0 above")]
     let num_markers = num_markers as usize;
 
     // Compute the byte offset at which the journal begins.
@@ -141,10 +138,7 @@ pub(crate) fn parse_markers_and_journal<R: Read + Seek>(
                 "invalid lMarkerTextLen: {text_len}"
             )));
         }
-        #[expect(
-            clippy::cast_sign_loss,
-            reason = "text_len checked >= 0 above"
-        )]
+        #[expect(clippy::cast_sign_loss, reason = "text_len checked >= 0 above")]
         let text_len = text_len as usize;
 
         let text_bytes = read_bytes(reader, text_len)?;
@@ -196,8 +190,7 @@ pub(crate) fn parse_markers_and_journal<R: Read + Seek>(
             reason = "text_len fits in i32 in practice (marker text is tiny)"
         )]
         {
-            bytes_consumed +=
-                MARKER_FIXED_BYTES as i32 + text_len as i32;
+            bytes_consumed += MARKER_FIXED_BYTES as i32 + text_len as i32;
             if has_timestamp {
                 bytes_consumed += MARKER_TIMESTAMP_BYTES as i32;
             }
@@ -208,10 +201,7 @@ pub(crate) fn parse_markers_and_journal<R: Read + Seek>(
     // total_length is measured from the start of the marker section header.
     let remaining = total_length - bytes_consumed;
     if remaining > 0 {
-        #[expect(
-            clippy::cast_sign_loss,
-            reason = "remaining checked > 0 above"
-        )]
+        #[expect(clippy::cast_sign_loss, reason = "remaining checked > 0 above")]
         let skip = remaining as u64;
         if let Err(e) = std::io::copy(&mut reader.by_ref().take(skip), &mut std::io::sink()) {
             warnings.push(Warning::new(alloc::format!(
@@ -254,10 +244,7 @@ fn parse_journal<R: Read>(reader: &mut R) -> Result<Option<Journal>, BiopacError
         return Ok(None);
     }
 
-    #[expect(
-        clippy::cast_sign_loss,
-        reason = "len checked > 0 above"
-    )]
+    #[expect(clippy::cast_sign_loss, reason = "len checked > 0 above")]
     let len = len as usize;
 
     let bytes = read_bytes(reader, len)?;
@@ -317,10 +304,7 @@ mod tests {
                 style_bytes[i] = b;
             }
             body.extend_from_slice(&style_bytes);
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "test text is tiny"
-            )]
+            #[expect(clippy::cast_possible_truncation, reason = "test text is tiny")]
             body.extend_from_slice(&write_i32_le(text.len() as i32));
             body.extend_from_slice(text.as_bytes());
             if has_ts {
@@ -330,10 +314,7 @@ mod tests {
         let total = MARKER_HDR_BYTES + body.len() as i32;
         let mut out = Vec::<u8>::new();
         out.extend_from_slice(&write_i32_le(total));
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "test marker count is tiny"
-        )]
+        #[expect(clippy::cast_possible_truncation, reason = "test marker count is tiny")]
         out.extend_from_slice(&write_i32_le(markers.len() as i32));
         out.extend_from_slice(&body);
         out
@@ -485,7 +466,7 @@ mod tests {
         let mut bytes = Vec::<u8>::new();
         bytes.extend_from_slice(&write_i32_le(8)); // total length = just the header
         bytes.extend_from_slice(&write_i32_le(0)); // 0 markers
-        // No journal — EOF
+                                                   // No journal — EOF
 
         let mut cur = Cursor::new(&bytes[..]);
         let result = parse_markers_and_journal(&mut cur, 73, &[])?;
@@ -494,4 +475,3 @@ mod tests {
         Ok(())
     }
 }
-
