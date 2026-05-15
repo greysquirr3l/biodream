@@ -173,23 +173,22 @@ pub fn to_csv<W: Write>(
 
     // --- Channel selection ------------------------------------------------
     // Validate all requested indices before touching the writer.
-    let selected: Vec<(usize, &crate::domain::Channel)> =
-        match &options.channel_indices {
-            None => datafile.channels.iter().enumerate().collect(),
-            Some(indices) => {
-                let mut out = Vec::with_capacity(indices.len());
-                for &idx in indices {
-                    let ch = datafile.channels.get(idx).ok_or_else(|| {
-                        BiopacError::InvalidChannel(format!(
-                            "channel index {idx} out of range (file has {} channels)",
-                            datafile.channels.len()
-                        ))
-                    })?;
-                    out.push((idx, ch));
-                }
-                out
+    let selected: Vec<(usize, &crate::domain::Channel)> = match &options.channel_indices {
+        None => datafile.channels.iter().enumerate().collect(),
+        Some(indices) => {
+            let mut out = Vec::with_capacity(indices.len());
+            for &idx in indices {
+                let ch = datafile.channels.get(idx).ok_or_else(|| {
+                    BiopacError::InvalidChannel(format!(
+                        "channel index {idx} out of range (file has {} channels)",
+                        datafile.channels.len()
+                    ))
+                })?;
+                out.push((idx, ch));
             }
-        };
+            out
+        }
+    };
 
     // --- Pre-compute sample arrays ----------------------------------------
     // Compute scaled floats (and optionally raw integers) for each channel
@@ -206,7 +205,11 @@ pub fn to_csv<W: Write>(
             None
         };
         let divider = usize::from(ch.frequency_divider).max(1);
-        bufs.push(ChannelBuf { scaled, raw, divider });
+        bufs.push(ChannelBuf {
+            scaled,
+            raw,
+            divider,
+        });
     }
 
     // --- Row count --------------------------------------------------------

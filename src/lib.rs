@@ -140,3 +140,23 @@ pub use export::csv::CsvOptions;
 /// Time-column format for CSV export.
 #[cfg(feature = "csv")]
 pub use export::csv::TimeFormat;
+
+// ---------------------------------------------------------------------------
+// Arrow / Parquet export convenience re-exports
+// ---------------------------------------------------------------------------
+
+/// Export a [`Datafile`] as an Arrow IPC stream.
+///
+/// See [`export::arrow::to_arrow_ipc`] for full documentation.
+#[cfg(any(feature = "arrow", feature = "parquet"))]
+pub use export::arrow::to_arrow_ipc;
+
+/// Export a [`Datafile`] as a Parquet file.
+///
+/// See [`export::parquet::to_parquet`] for full documentation.
+#[cfg(feature = "parquet")]
+pub use export::parquet::to_parquet;
+
+/// Options for Parquet export (compression level, …).
+#[cfg(feature = "parquet")]
+pub use export::parquet::ParquetOptions;

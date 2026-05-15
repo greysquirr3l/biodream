@@ -77,7 +77,8 @@ anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 
 [dev-dependencies]
-# No test helpers yet — added as needed in T05+.
+# bytes: in-memory ChunkReader for Parquet round-trip tests.
+bytes = "1"
 
 [package.metadata.docs.rs]
 all-features = true

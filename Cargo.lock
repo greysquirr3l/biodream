@@ -253,6 +253,7 @@ dependencies = [
  "arrow-ipc",
  "arrow-schema",
  "binrw",
+ "bytes",
  "clap",
  "csv",
  "flate2",

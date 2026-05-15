@@ -55,6 +55,20 @@ pub enum BiopacError {
     /// A general validation failure (e.g. inconsistent header counts).
     #[error("validation error: {0}")]
     Validation(String),
+
+    /// An Apache Arrow error during schema construction or IPC serialisation.
+    ///
+    /// Only available with the `arrow` or `parquet` feature.
+    #[cfg(any(feature = "arrow", feature = "parquet"))]
+    #[error("arrow error: {0}")]
+    Arrow(#[from] arrow_schema::ArrowError),
+
+    /// A Parquet serialisation error.
+    ///
+    /// Only available with the `parquet` feature.
+    #[cfg(feature = "parquet")]
+    #[error("parquet error: {0}")]
+    Parquet(#[from] parquet::errors::ParquetError),
 }
 
 // Compile-time assertion: BiopacError is Send + Sync so it can flow across

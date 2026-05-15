@@ -124,9 +124,7 @@ fn csv_full_pipeline_via_read_bytes() -> Result<(), BiopacError> {
     // Interleaved data: CH0 values 0,1,2,3 — CH1 values 10,11,12,13
     for s in 0..n {
         for ch in 0..channels {
-            blob.extend_from_slice(
-                &i16::try_from(ch * 10 + s).unwrap_or(0).to_le_bytes(),
-            );
+            blob.extend_from_slice(&i16::try_from(ch * 10 + s).unwrap_or(0).to_le_bytes());
         }
     }
 
@@ -193,7 +191,10 @@ fn csv_channel_filter_integration() -> Result<(), BiopacError> {
     let header = rows
         .first()
         .ok_or_else(|| BiopacError::Validation("missing header".into()))?;
-    assert_eq!(header.iter().map(String::as_str).collect::<Vec<_>>(), ["time_s", "C"]);
+    assert_eq!(
+        header.iter().map(String::as_str).collect::<Vec<_>>(),
+        ["time_s", "C"]
+    );
 
     let r1 = rows
         .get(1)
@@ -428,10 +429,7 @@ fn csv_include_raw_columns() -> Result<(), BiopacError> {
     let header = rows
         .first()
         .ok_or_else(|| BiopacError::Validation("missing header".into()))?;
-    assert!(
-        header.iter().any(|c| c == "SIG"),
-        "SIG column should exist"
-    );
+    assert!(header.iter().any(|c| c == "SIG"), "SIG column should exist");
     assert!(
         header.iter().any(|c| c == "SIG_raw"),
         "SIG_raw column should exist"
