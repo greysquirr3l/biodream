@@ -69,7 +69,7 @@ arrow-schema = { version = "54", optional = true }
 arrow-ipc = { version = "54", optional = true }
 
 # Parquet export.
-parquet = { version = "54", optional = true }
+parquet = { version = "58", optional = true }
 
 # CLI binary dependencies — only used from src/main.rs and src/cli/.
 # Not imported by lib.rs code.
