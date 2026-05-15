@@ -4,7 +4,12 @@ targets = []
 
 [advisories]
 # Known security advisories to ignore (RUSTSEC IDs go here).
-ignore = []
+ignore = [
+    # paste 1.x is unmaintained (archived by dtolnay); pulled in directly by
+    # parquet 58.x. No patched version exists and the dep is not actionable
+    # until the Apache Arrow project removes it.
+    { id = "RUSTSEC-2024-0436", reason = "transitive via parquet; no patched version available" },
+]
 
 [licenses]
 # Allowlist of licenses. SPDX identifiers.
