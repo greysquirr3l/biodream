@@ -1,0 +1,14 @@
+# Ignore reference projects
+
+reference_projects/
+
+# Ignore dependency/vendor content
+
+node_modules/
+node_modules/**
+**/node_modules/**
+crates/stygian-plugin/extension/node_modules/**
+
+# License file
+
+LICENSE

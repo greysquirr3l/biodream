@@ -1,0 +1,60 @@
+# ─── Project-specific ─────────────────────────────────────────────────────────
+.coraline/
+.vscode/
+docs/dev/
+reference_projects/
+
+plan.toml
+tasks/
+AGENTS.md
+features.json
+IMPLEMENTATION_PLAN.md
+PROGRESS.md
+
+# ─── Rust ─────────────────────────────────────────────────────────────────────
+# Cargo.lock is intentionally tracked — this crate ships a [[bin]] target.
+debug/
+target/
+**/*.rs.bk
+*.pdb
+
+# ─── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+.apdisk
+
+# ─── Windows ──────────────────────────────────────────────────────────────────
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.stackdump
+*.lnk
+
+# ─── Linux ────────────────────────────────────────────────────────────────────
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ─── Editors ──────────────────────────────────────────────────────────────────
+*.swp
+*.swo
+*.swn
+.idea/
+*.iml
+.fleet/

@@ -1,0 +1,42 @@
+[graph]
+# Check all targets, not just the host platform.
+targets = []
+
+[advisories]
+# Known security advisories to ignore (RUSTSEC IDs go here).
+ignore = []
+
+[licenses]
+# Allowlist of licenses. SPDX identifiers.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "Zlib",
+    "OpenSSL",
+]
+deny = []
+# Copyleft licenses are not acceptable in this project.
+copyleft = "deny"
+# Unlicensed crates are rejected.
+allow-osi-fsf-free = "neither"
+default = "deny"
+confidence-threshold = 0.8
+
+[bans]
+# Warn on duplicate versions of the same crate (some duplication is tolerated
+# in large dependency trees like arrow/parquet).
+multiple-versions = "warn"
+wildcards = "deny"
+deny = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
