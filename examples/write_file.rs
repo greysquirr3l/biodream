@@ -25,7 +25,8 @@ fn main() {
 #[cfg(feature = "write")]
 #[expect(
     clippy::cast_possible_truncation,
-    reason = "sine amplitude * 1000 fits in i16"
+    clippy::cast_precision_loss,
+    reason = "sine amplitude * 1000 fits in i16; usize-to-f64 for time index is intentional"
 )]
 fn run() {
     use std::{env, process};
@@ -33,13 +34,11 @@ fn run() {
     use biodream::{ByteOrder, Channel, ChannelData, Datafile, FileRevision, GraphMetadata};
 
     let args: Vec<String> = env::args().collect();
-    let output = match args.get(1) {
-        Some(p) => p.clone(),
-        None => {
-            eprintln!("Usage: write_file <output.acq>");
-            process::exit(1);
-        }
+    let Some(output) = args.get(1) else {
+        eprintln!("Usage: write_file <output.acq>");
+        process::exit(1);
     };
+    let output = output.clone();
 
     // Build a synthetic 2-channel recording at 1000 Hz.
     let n_samples: usize = 1000;

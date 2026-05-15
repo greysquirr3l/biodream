@@ -22,9 +22,8 @@ fn main() {
     println!("cargo::rerun-if-changed=.git/refs/heads/");
 
     // Detect crates.io installs (no .git directory present).
-    let is_crates_io = env::var("CARGO_MANIFEST_DIR")
-        .map(|d| d.contains("/.cargo/registry/src/"))
-        .unwrap_or(false);
+    let is_crates_io =
+        env::var("CARGO_MANIFEST_DIR").is_ok_and(|d| d.contains("/.cargo/registry/src/"));
 
     let (sha, date) = if is_crates_io {
         ("crates.io".to_owned(), "crates.io".to_owned())

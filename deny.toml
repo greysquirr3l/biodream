@@ -4,11 +4,7 @@ targets = []
 
 [advisories]
 # Known security advisories to ignore (RUSTSEC IDs go here).
-ignore = [
-    # paste 1.x is unmaintained (archived by dtolnay); pulled in transitively
-    # by ahash ← arrow/parquet. Not actionable until parquet drops ahash.
-    { id = "RUSTSEC-2024-0436", reason = "transitive via parquet/ahash; no patched version available" },
-]
+ignore = []
 
 [licenses]
 # Allowlist of licenses. SPDX identifiers.
