@@ -1,0 +1,33 @@
+{
+  "channel_count": 1,
+  "channels": [
+    {
+      "frequency_divider": 1,
+      "name": "ECG",
+      "point_count": 500,
+      "samples_per_second": 1000.0,
+      "units": "mV"
+    }
+  ],
+  "compressed": false,
+  "journal": null,
+  "markers": [
+    {
+      "channel": null,
+      "global_sample_index": 0,
+      "label": "Baseline"
+    },
+    {
+      "channel": null,
+      "global_sample_index": 200,
+      "label": "Stimulus"
+    },
+    {
+      "channel": null,
+      "global_sample_index": 400,
+      "label": "Response"
+    }
+  ],
+  "revision": 43,
+  "samples_per_second": 1000.0
+}

@@ -80,6 +80,8 @@ serde_json = "1"
 [dev-dependencies]
 # bytes: in-memory ChunkReader for Parquet round-trip tests.
 bytes = "1"
+# property-based testing for write → read round-trip coverage.
+proptest = "1"
 
 [package.metadata.docs.rs]
 all-features = true

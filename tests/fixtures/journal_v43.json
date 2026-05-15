@@ -1,0 +1,17 @@
+{
+  "channel_count": 1,
+  "channels": [
+    {
+      "frequency_divider": 1,
+      "name": "ECG",
+      "point_count": 100,
+      "samples_per_second": 1000.0,
+      "units": "mV"
+    }
+  ],
+  "compressed": false,
+  "journal": "Subject: S01\nCondition: Rest\n",
+  "markers": [],
+  "revision": 43,
+  "samples_per_second": 1000.0
+}

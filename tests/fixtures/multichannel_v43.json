@@ -1,0 +1,24 @@
+{
+  "channel_count": 2,
+  "channels": [
+    {
+      "frequency_divider": 1,
+      "name": "ECG",
+      "point_count": 100,
+      "samples_per_second": 1000.0,
+      "units": "mV"
+    },
+    {
+      "frequency_divider": 1,
+      "name": "RESP",
+      "point_count": 100,
+      "samples_per_second": 1000.0,
+      "units": "au"
+    }
+  ],
+  "compressed": false,
+  "journal": null,
+  "markers": [],
+  "revision": 43,
+  "samples_per_second": 1000.0
+}
