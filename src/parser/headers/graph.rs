@@ -447,11 +447,11 @@ mod tests {
     ) -> [u8; 256] {
         let mut b = [0u8; 256];
         // offset 0-1: unused i16 = 0
-        b[2..6].copy_from_slice(&version.to_le_bytes());          // lVersion at offset 2
-        b[6..10].copy_from_slice(&256i32.to_le_bytes());           // lExtItemHeaderLen = 256 at offset 6
-        b[10..12].copy_from_slice(&channels.to_le_bytes());        // nChannels at offset 10
+        b[2..6].copy_from_slice(&version.to_le_bytes()); // lVersion at offset 2
+        b[6..10].copy_from_slice(&256i32.to_le_bytes()); // lExtItemHeaderLen = 256 at offset 6
+        b[10..12].copy_from_slice(&channels.to_le_bytes()); // nChannels at offset 10
         // offsets 12-15: nHorizAxisType, nCurrChannel = 0
-        b[16..24].copy_from_slice(&sample_time_ms.to_le_bytes());  // dSampleTime at offset 16
+        b[16..24].copy_from_slice(&sample_time_ms.to_le_bytes()); // dSampleTime at offset 16
         // offsets 24-251 = 0
         b[252..254].copy_from_slice(&chan_header_len.to_le_bytes()); // nExtItemHeaderLen at offset 252
         // 254-255 pad = 0
@@ -520,9 +520,9 @@ mod tests {
     ) -> Vec<u8> {
         let mut b = vec![0u8; header_len.max(40) as usize];
         // offset 0-1: unused i16 = 0
-        b[2..6].copy_from_slice(&version.to_le_bytes());       // lVersion at offset 2
-        b[6..10].copy_from_slice(&header_len.to_le_bytes());   // lExtItemHeaderLen at offset 6
-        b[10..12].copy_from_slice(&channels.to_le_bytes());    // nChannels at offset 10
+        b[2..6].copy_from_slice(&version.to_le_bytes()); // lVersion at offset 2
+        b[6..10].copy_from_slice(&header_len.to_le_bytes()); // lExtItemHeaderLen at offset 6
+        b[10..12].copy_from_slice(&channels.to_le_bytes()); // nChannels at offset 10
         // offsets 12-15: nHorizAxisType, nCurrChannel = 0
         b[16..24].copy_from_slice(&sample_time_ms.to_le_bytes()); // dSampleTime at offset 16
         b
@@ -559,11 +559,11 @@ mod tests {
         let header_len: i32 = 1940;
         let mut bytes = vec![0u8; header_len as usize];
         // offset 0-1: unused i16 = 0
-        bytes[2..6].copy_from_slice(&77i32.to_le_bytes());        // revision 77 at offset 2
-        bytes[6..10].copy_from_slice(&header_len.to_le_bytes());  // lExtItemHeaderLen at offset 6
-        bytes[10..12].copy_from_slice(&1i16.to_le_bytes());       // 1 channel at offset 10
+        bytes[2..6].copy_from_slice(&77i32.to_le_bytes()); // revision 77 at offset 2
+        bytes[6..10].copy_from_slice(&header_len.to_le_bytes()); // lExtItemHeaderLen at offset 6
+        bytes[10..12].copy_from_slice(&1i16.to_le_bytes()); // 1 channel at offset 10
         // offsets 12-15: horiz/curr = 0
-        bytes[16..24].copy_from_slice(&1.0f64.to_le_bytes());     // 1 ms -> 1000 Hz at offset 16
+        bytes[16..24].copy_from_slice(&1.0f64.to_le_bytes()); // 1 ms -> 1000 Hz at offset 16
         bytes[1936] = 1; // bCompressed = true
 
         let mut cursor = Cursor::new(&bytes);
@@ -600,10 +600,10 @@ mod tests {
         let header_len: i32 = 300;
         let mut bytes = vec![0u8; header_len as usize];
         // offset 0-1: unused i16 = 0
-        bytes[2..6].copy_from_slice(&68i32.to_le_bytes());        // revision 68 at offset 2
-        bytes[6..10].copy_from_slice(&header_len.to_le_bytes());  // lExtItemHeaderLen at offset 6
-        bytes[10..12].copy_from_slice(&1i16.to_le_bytes());       // 1 channel at offset 10
-        bytes[16..24].copy_from_slice(&1.0f64.to_le_bytes());     // dSampleTime at offset 16
+        bytes[2..6].copy_from_slice(&68i32.to_le_bytes()); // revision 68 at offset 2
+        bytes[6..10].copy_from_slice(&header_len.to_le_bytes()); // lExtItemHeaderLen at offset 6
+        bytes[10..12].copy_from_slice(&1i16.to_le_bytes()); // 1 channel at offset 10
+        bytes[16..24].copy_from_slice(&1.0f64.to_le_bytes()); // dSampleTime at offset 16
         // Write "ECG Test" at offset 236.
         let title = b"ECG Test\0";
         bytes[236..236 + title.len()].copy_from_slice(title);

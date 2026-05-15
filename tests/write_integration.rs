@@ -453,8 +453,12 @@ fn write_compressed_data_matches_uncompressed() -> Result<(), Box<dyn std::error
     let uncompressed_bytes = write_to_bytes(&df)?;
     let compressed_bytes = write_to_bytes_with(&df, &WriteOptions::new().compressed(true))?;
 
-    let plain = ReadOptions::new().read_bytes(&uncompressed_bytes)?.into_value();
-    let comp = ReadOptions::new().read_bytes(&compressed_bytes)?.into_value();
+    let plain = ReadOptions::new()
+        .read_bytes(&uncompressed_bytes)?
+        .into_value();
+    let comp = ReadOptions::new()
+        .read_bytes(&compressed_bytes)?
+        .into_value();
 
     assert_eq!(plain.channels.len(), comp.channels.len());
 

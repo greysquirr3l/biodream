@@ -23,7 +23,10 @@ fn main() {
 }
 
 #[cfg(feature = "write")]
-#[expect(clippy::cast_possible_truncation, reason = "sine amplitude * 1000 fits in i16")]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "sine amplitude * 1000 fits in i16"
+)]
 fn run() {
     use std::{env, process};
 

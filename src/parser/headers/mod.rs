@@ -259,11 +259,11 @@ mod tests {
         let version: i32 = 38;
         let chan_header_len: i16 = 252;
         // offset 0-1: unused i16 = 0
-        gh[2..6].copy_from_slice(&version.to_le_bytes());            // lVersion at offset 2
-        gh[6..10].copy_from_slice(&256i32.to_le_bytes());            // lExtItemHeaderLen = 256 at offset 6
+        gh[2..6].copy_from_slice(&version.to_le_bytes()); // lVersion at offset 2
+        gh[6..10].copy_from_slice(&256i32.to_le_bytes()); // lExtItemHeaderLen = 256 at offset 6
         gh[10..12].copy_from_slice(&(n_channels as i16).to_le_bytes()); // nChannels at offset 10
         // offsets 12-15: horiz/curr = 0
-        gh[16..24].copy_from_slice(&sample_time_ms.to_le_bytes());   // dSampleTime at offset 16
+        gh[16..24].copy_from_slice(&sample_time_ms.to_le_bytes()); // dSampleTime at offset 16
         // offsets 24-251 = 0
         gh[252..254].copy_from_slice(&chan_header_len.to_le_bytes()); // nExtItemHeaderLen at offset 252
         buf.extend_from_slice(&gh);
@@ -367,11 +367,11 @@ mod tests {
         // --- Graph header (256 bytes) ---
         let mut gh = [0u8; 256];
         // offset 0-1: unused i16 = 0
-        gh[2..6].copy_from_slice(&38i32.to_le_bytes());             // lVersion = 38 at offset 2
-        gh[6..10].copy_from_slice(&256i32.to_le_bytes());           // lExtItemHeaderLen = 256 at offset 6
-        gh[10..12].copy_from_slice(&1i16.to_le_bytes());            // 1 channel at offset 10
+        gh[2..6].copy_from_slice(&38i32.to_le_bytes()); // lVersion = 38 at offset 2
+        gh[6..10].copy_from_slice(&256i32.to_le_bytes()); // lExtItemHeaderLen = 256 at offset 6
+        gh[10..12].copy_from_slice(&1i16.to_le_bytes()); // 1 channel at offset 10
         // offsets 12-15: horiz/curr = 0
-        gh[16..24].copy_from_slice(&1.0f64.to_le_bytes());          // 1 ms -> 1000 Hz at offset 16
+        gh[16..24].copy_from_slice(&1.0f64.to_le_bytes()); // 1 ms -> 1000 Hz at offset 16
         gh[252..254].copy_from_slice(&(chan_header_len as i16).to_le_bytes());
         buf.extend_from_slice(&gh);
 

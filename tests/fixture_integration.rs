@@ -30,10 +30,7 @@ fn fixtures_dir() -> PathBuf {
 /// Load the `.acq` file and its `.json` sidecar from `tests/fixtures/<name>`.
 fn load_fixture(
     name: &str,
-) -> Result<
-    (biodream::Datafile, serde_json::Value),
-    Box<dyn std::error::Error>,
-> {
+) -> Result<(biodream::Datafile, serde_json::Value), Box<dyn std::error::Error>> {
     let dir = fixtures_dir();
 
     let acq_path = dir.join(format!("{name}.acq"));
@@ -70,11 +67,7 @@ fn assert_metadata(
     );
 
     let expected_ch_count = s["channel_count"].as_u64().ok_or("channel_count missing")?;
-    assert_eq!(
-        df.channels.len() as u64,
-        expected_ch_count,
-        "channel_count"
-    );
+    assert_eq!(df.channels.len() as u64, expected_ch_count, "channel_count");
 
     Ok(())
 }
@@ -94,8 +87,14 @@ fn assert_channels(
         let exp_units = exp["units"].as_str().ok_or("units missing")?;
         assert_eq!(ch.units, exp_units, "ch[{i}].units");
 
-        let exp_div = exp["frequency_divider"].as_u64().ok_or("freq_div missing")?;
-        assert_eq!(u64::from(ch.frequency_divider), exp_div, "ch[{i}].frequency_divider");
+        let exp_div = exp["frequency_divider"]
+            .as_u64()
+            .ok_or("freq_div missing")?;
+        assert_eq!(
+            u64::from(ch.frequency_divider),
+            exp_div,
+            "ch[{i}].frequency_divider"
+        );
 
         let exp_count = exp["point_count"].as_u64().ok_or("point_count missing")?;
         assert_eq!(ch.point_count as u64, exp_count, "ch[{i}].point_count");
@@ -120,8 +119,7 @@ fn assert_markers(
             .as_u64()
             .ok_or("global_sample_index missing")?;
         assert_eq!(
-            m.global_sample_index as u64,
-            exp_idx,
+            m.global_sample_index as u64, exp_idx,
             "marker[{i}].global_sample_index"
         );
     }

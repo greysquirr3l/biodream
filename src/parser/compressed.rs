@@ -317,7 +317,10 @@ mod tests {
         }
     }
 
-    #[expect(clippy::expect_used, reason = "test helper: compress on known-valid data cannot fail")]
+    #[expect(
+        clippy::expect_used,
+        reason = "test helper: compress on known-valid data cannot fail"
+    )]
     fn compress_data(data: &[u8]) -> Vec<u8> {
         use flate2::{Compress, FlushCompress};
         let mut c = Compress::new(flate2::Compression::default(), true);
@@ -464,7 +467,10 @@ mod tests {
     }
 
     #[test]
-    #[expect(clippy::panic, reason = "test: unreachable given the preceding is_err() assertion")]
+    #[expect(
+        clippy::panic,
+        reason = "test: unreachable given the preceding is_err() assertion"
+    )]
     fn decompression_error_returns_compression_error() {
         // Feed garbage bytes as compressed data.
         let bad_data = vec![0xFFu8; 16];

@@ -61,7 +61,10 @@ fn arb_datafile() -> impl Strategy<Value = Datafile> {
                 metadata: GraphMetadata {
                     file_revision: FileRevision::new(43),
                     samples_per_second: 1000.0,
-                    #[expect(clippy::cast_possible_truncation, reason = "n_ch bounded 1..=3, always fits u16")]
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        reason = "n_ch bounded 1..=3, always fits u16"
+                    )]
                     channel_count: n_ch as u16,
                     byte_order: ByteOrder::LittleEndian,
                     compressed: false,
