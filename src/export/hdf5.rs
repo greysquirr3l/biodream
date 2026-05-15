@@ -1,3 +1,4 @@
-//! HDF5 export stub (requires `hdf5` feature and libhdf5-dev system library).
-
-// TODO(T11): implement HDF5Exporter when the hdf5 system dep is wired in.
+//! HDF5 export (requires `hdf5` feature and the `libhdf5-dev` system library).
+//!
+//! This module is intentionally empty until the `hdf5` Rust crate dependency
+//! is added and the system library is available. The feature gate is in place.

@@ -21,12 +21,8 @@ allow = [
     "Zlib",
     "OpenSSL",
 ]
-deny = []
 # Copyleft licenses are not acceptable in this project.
-copyleft = "deny"
 # Unlicensed crates are rejected.
-allow-osi-fsf-free = "neither"
-default = "deny"
 confidence-threshold = 0.8
 
 [bans]
