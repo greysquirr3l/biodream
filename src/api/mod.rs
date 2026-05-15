@@ -16,6 +16,10 @@
 
 extern crate alloc;
 
+/// Low-level header inspection API — returns diagnostic info without loading sample data.
+#[cfg(feature = "read")]
+pub mod inspect;
+
 #[cfg(feature = "read")]
 use std::{
     fs::File,

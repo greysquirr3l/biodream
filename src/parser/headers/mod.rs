@@ -52,10 +52,6 @@ pub(crate) struct ParsedHeaders {
     /// Per-channel descriptors (one entry per channel).
     pub channel_metadata: Vec<ChannelMetadata>,
     /// Opaque hardware-specific foreign data section.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "consumed by T06 marker/journal parser")
-    )]
     pub foreign_data: Vec<u8>,
     /// Sample type for each channel (same length as `channel_metadata`).
     pub sample_types: Vec<SampleType>,

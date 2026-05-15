@@ -160,3 +160,26 @@ pub use export::parquet::to_parquet;
 /// Options for Parquet export (compression level, …).
 #[cfg(feature = "parquet")]
 pub use export::parquet::ParquetOptions;
+
+// ---------------------------------------------------------------------------
+// Inspect API — parse headers only, no sample data loaded
+// ---------------------------------------------------------------------------
+
+/// Parse headers from a `.acq` file without loading sample data.
+///
+/// Returns an [`InspectReport`] with graph metadata, per-channel info,
+/// foreign-data length, and the byte offset where sample data begins.
+#[cfg(feature = "read")]
+pub use api::inspect::inspect_file;
+
+/// Parse headers from an in-memory `.acq` byte slice without loading samples.
+#[cfg(feature = "read")]
+pub use api::inspect::inspect_bytes;
+
+/// Low-level diagnostic report returned by [`inspect_file`] and [`inspect_bytes`].
+#[cfg(feature = "read")]
+pub use api::inspect::InspectReport;
+
+/// Per-channel header info in an [`InspectReport`].
+#[cfg(feature = "read")]
+pub use api::inspect::ChannelInspect;
