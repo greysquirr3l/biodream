@@ -44,6 +44,9 @@ hdf5 = []
 # Serde derive support for domain types.
 serde = ["dep:serde"]
 
+# Waveform image generation (PNG / SVG).
+plot = ["read", "dep:plotters"]
+
 # Default: read + CSV.
 default = ["read", "csv"]
 
@@ -70,6 +73,9 @@ arrow-ipc = { version = "58", optional = true }
 
 # Parquet export.
 parquet = { version = "58", optional = true }
+
+# Waveform image rendering.
+plotters = { version = "0.3", optional = true, default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "all_series"] }
 
 # CLI binary dependencies — only used from src/main.rs and src/cli/.
 # Not imported by lib.rs code.

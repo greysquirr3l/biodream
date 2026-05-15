@@ -7,6 +7,8 @@ mod convert;
 mod info;
 mod inspect;
 mod markers;
+#[cfg(feature = "plot")]
+mod plot;
 
 use clap::{Parser, Subcommand};
 
@@ -14,6 +16,8 @@ use convert::ConvertArgs;
 use info::InfoArgs;
 use inspect::InspectArgs;
 use markers::MarkersArgs;
+#[cfg(feature = "plot")]
+use plot::PlotArgs;
 
 // ---------------------------------------------------------------------------
 // Top-level CLI struct
@@ -56,6 +60,10 @@ enum Command {
 
     /// Show low-level binary layout diagnostics.
     Inspect(InspectArgs),
+
+    /// Render channel waveforms as a PNG or SVG image.
+    #[cfg(feature = "plot")]
+    Plot(PlotArgs),
 }
 
 // ---------------------------------------------------------------------------
@@ -70,5 +78,7 @@ pub fn run() -> anyhow::Result<()> {
         Command::Convert(args) => convert::run(args),
         Command::Markers(args) => markers::run(&args),
         Command::Inspect(args) => inspect::run(&args),
+        #[cfg(feature = "plot")]
+        Command::Plot(args) => plot::run(&args),
     }
 }

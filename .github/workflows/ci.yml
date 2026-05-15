@@ -37,7 +37,7 @@ jobs:
       - name: Build (all features except hdf5)
         run: >
           cargo build --workspace
-          --features "read,write,csv,arrow,parquet,serde"
+          --features "read,write,csv,arrow,parquet,serde,plot"
 
       # Build the no_std path — only domain + error + parser stubs, no I/O.
       - name: Build (no-default-features, no_std path)
@@ -47,13 +47,13 @@ jobs:
       - name: Test (all features except hdf5)
         run: >
           cargo test --workspace
-          --features "read,write,csv,arrow,parquet,serde"
+          --features "read,write,csv,arrow,parquet,serde,plot"
 
       # Full lint profile from AGENTS.md.
       - name: Lint
         run: >
           cargo clippy --workspace --all-targets
-          --features "read,write,csv,arrow,parquet,serde"
+          --features "read,write,csv,arrow,parquet,serde,plot"
           --
           -W clippy::all
           -W clippy::pedantic
@@ -114,7 +114,7 @@ jobs:
       - name: Build docs
         run: >
           cargo doc --workspace --no-deps
-          --features "read,write,csv,arrow,parquet,serde"
+          --features "read,write,csv,arrow,parquet,serde,plot"
         env:
           RUSTDOCFLAGS: "-D warnings"
 
@@ -135,4 +135,4 @@ jobs:
       - name: Check MSRV
         run: >
           cargo check --workspace
-          --features "read,write,csv,arrow,parquet,serde"
+          --features "read,write,csv,arrow,parquet,serde,plot"
