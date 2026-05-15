@@ -73,7 +73,9 @@ pub fn read_stream<R: Read + Seek>(mut reader: R) -> Result<ParseResult<Datafile
         //    the right byte regardless of how much the reader overread.
         if let Some(data_bytes) = headers.uncompressed_data_byte_count() {
             let marker_start = headers.data_start_offset.saturating_add(data_bytes);
-            reader.seek(SeekFrom::Start(marker_start)).map_err(BiopacError::Io)?;
+            reader
+                .seek(SeekFrom::Start(marker_start))
+                .map_err(BiopacError::Io)?;
         }
         // 3. Then parse markers.
         let mj = parse_markers_and_journal(&mut reader, file_revision, &display_orders);

@@ -286,7 +286,11 @@ fn datafile_channel_by_name() -> Result<(), BiopacError> {
 
     let ch = df.channel("CH0");
     assert!(ch.is_some(), "channel 'CH0' should exist");
-    assert_eq!(ch.ok_or_else(|| BiopacError::InvalidChannel("CH0".into()))?.name, "CH0");
+    assert_eq!(
+        ch.ok_or_else(|| BiopacError::InvalidChannel("CH0".into()))?
+            .name,
+        "CH0"
+    );
 
     assert!(df.channel("NOTEXIST").is_none());
     Ok(())
@@ -536,7 +540,10 @@ fn open_file_into_datafile_before_load() -> Result<(), BiopacError> {
 
     let df = lazy.into_datafile()?;
     assert_eq!(df.channel_count(), 2);
-    assert_eq!(get_channel(&df.channels, 0)?.scaled_samples(), vec![0.0, 1.0, 2.0, 3.0]);
+    assert_eq!(
+        get_channel(&df.channels, 0)?.scaled_samples(),
+        vec![0.0, 1.0, 2.0, 3.0]
+    );
 
     let _ = std::fs::remove_file(path);
     Ok(())

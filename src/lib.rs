@@ -122,3 +122,21 @@ pub fn read_stream<R: std::io::Read + std::io::Seek>(
 pub fn open_file(path: impl AsRef<std::path::Path>) -> Result<LazyDatafile, BiopacError> {
     api::open_file(path)
 }
+
+// ---------------------------------------------------------------------------
+// CSV export convenience re-exports
+// ---------------------------------------------------------------------------
+
+/// Export a [`Datafile`] to CSV.
+///
+/// See [`export::csv::to_csv`] for full documentation.
+#[cfg(feature = "csv")]
+pub use export::csv::to_csv;
+
+/// Options controlling CSV output (delimiter, precision, time format, …).
+#[cfg(feature = "csv")]
+pub use export::csv::CsvOptions;
+
+/// Time-column format for CSV export.
+#[cfg(feature = "csv")]
+pub use export::csv::TimeFormat;

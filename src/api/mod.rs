@@ -29,11 +29,7 @@ use std::{
 use crate::{
     domain::{Channel, ChannelData, ChannelMetadata, Datafile, GraphMetadata, Journal, Marker},
     error::{BiopacError, ParseResult, Warning},
-    parser::{
-        headers::parse_headers,
-        markers::parse_markers_and_journal,
-        reader::read_stream,
-    },
+    parser::{headers::parse_headers, markers::parse_markers_and_journal, reader::read_stream},
 };
 
 // ---------------------------------------------------------------------------
