@@ -46,7 +46,10 @@ pub fn run() -> anyhow::Result<()> {
     match cli.command {
         Command::Info { path } => {
             // TODO(T12): implement info subcommand.
-            anyhow::bail!("info subcommand not yet implemented (T12): {}", path.display());
+            anyhow::bail!(
+                "info subcommand not yet implemented (T12): {}",
+                path.display()
+            );
         }
         Command::Convert { path, output } => {
             // TODO(T12): implement convert subcommand.
@@ -58,7 +61,10 @@ pub fn run() -> anyhow::Result<()> {
         }
         Command::Inspect { path } => {
             // TODO(T12): implement inspect subcommand.
-            anyhow::bail!("inspect subcommand not yet implemented (T12): {}", path.display());
+            anyhow::bail!(
+                "inspect subcommand not yet implemented (T12): {}",
+                path.display()
+            );
         }
     }
 }

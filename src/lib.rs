@@ -45,7 +45,7 @@ pub mod export;
 
 // Top-level re-exports for the most commonly used types.
 pub use domain::{
-    ByteOrder, Channel, ChannelData, ChannelMetadata, Datafile, FileRevision,
-    GraphMetadata, Journal, Marker, MarkerStyle, Timestamp,
+    ByteOrder, Channel, ChannelData, ChannelMetadata, Datafile, FileRevision, GraphMetadata,
+    Journal, Marker, MarkerStyle, Timestamp,
 };
 pub use error::{BiopacError, ParseResult, Warning};

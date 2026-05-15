@@ -96,9 +96,7 @@ impl Channel {
             ChannelData::Raw(raw) => raw.iter().map(|&v| f64::from(v)).collect(),
             ChannelData::Float(f) => f.clone(),
             ChannelData::Scaled { raw, scale, offset } => {
-                raw.iter()
-                    .map(|&v| f64::from(v) * scale + offset)
-                    .collect()
+                raw.iter().map(|&v| f64::from(v) * scale + offset).collect()
             }
         }
     }

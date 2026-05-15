@@ -7,6 +7,7 @@
 
 use std::io::{Read, Seek};
 
+use super::headers::parse_headers;
 use crate::domain::Datafile;
 use crate::error::{BiopacError, ParseResult};
 
@@ -14,10 +15,10 @@ use crate::error::{BiopacError, ParseResult};
 ///
 /// Returns a [`ParseResult`] that bundles the [`Datafile`] with any
 /// non-fatal [`Warning`](crate::error::Warning)s encountered during parsing.
-pub fn read_stream<R: Read + Seek>(
-    _reader: R,
-) -> Result<ParseResult<Datafile>, BiopacError> {
+pub fn read_stream<R: Read + Seek>(mut reader: R) -> Result<ParseResult<Datafile>, BiopacError> {
+    // Parse all headers — byte order, graph, channels, foreign data, dtypes.
     // TODO(T09): wire up header parser → data reader → markers → journal.
+    let _headers = parse_headers(&mut reader)?;
     Err(BiopacError::Validation(
         "read_stream is not yet implemented (T09)".into(),
     ))
@@ -25,9 +26,7 @@ pub fn read_stream<R: Read + Seek>(
 
 #[cfg(feature = "std")]
 /// Read a `.acq` file from the filesystem by path.
-pub fn read_file(
-    path: impl AsRef<std::path::Path>,
-) -> Result<ParseResult<Datafile>, BiopacError> {
+pub fn read_file(path: impl AsRef<std::path::Path>) -> Result<ParseResult<Datafile>, BiopacError> {
     let file = std::fs::File::open(path)?;
     let reader = std::io::BufReader::new(file);
     read_stream(reader)

@@ -8,8 +8,8 @@
 //! - [`compressed`] — per-channel zlib decompression (T07)
 //! - [`reader`] — high-level `read_file` / `read_stream` API (T09, requires `std`)
 
+#[cfg(feature = "read")]
 pub mod headers;
-
 // TODO(T05): implement streaming interleaved reader
 pub mod interleaved;
 

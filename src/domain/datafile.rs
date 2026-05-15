@@ -134,7 +134,10 @@ mod tests {
     fn channel_by_name_found() {
         let df = make_datafile();
         assert!(df.channel_by_name("ECG").is_some());
-        assert_eq!(df.channel_by_name("ECG").map(|c| &c.units), Some(&String::from("mV")));
+        assert_eq!(
+            df.channel_by_name("ECG").map(|c| &c.units),
+            Some(&String::from("mV"))
+        );
     }
 
     #[test]
