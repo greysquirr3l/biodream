@@ -3,11 +3,11 @@
 //! This module exposes `read_file` and `read_stream` — the public entry points
 //! for reading .acq files from disk or arbitrary `Read + Seek` streams.
 
-// TODO(T09): implement read_file, read_stream, and lazy channel loading.
-
 use std::io::{Read, Seek};
+use std::vec::Vec;
 
 use super::headers::parse_headers;
+use super::interleaved::read_interleaved;
 use crate::domain::Datafile;
 use crate::error::{BiopacError, ParseResult};
 
@@ -16,12 +16,23 @@ use crate::error::{BiopacError, ParseResult};
 /// Returns a [`ParseResult`] that bundles the [`Datafile`] with any
 /// non-fatal [`Warning`](crate::error::Warning)s encountered during parsing.
 pub fn read_stream<R: Read + Seek>(mut reader: R) -> Result<ParseResult<Datafile>, BiopacError> {
-    // Parse all headers — byte order, graph, channels, foreign data, dtypes.
-    // TODO(T09): wire up header parser → data reader → markers → journal.
-    let _headers = parse_headers(&mut reader)?;
-    Err(BiopacError::Validation(
-        "read_stream is not yet implemented (T09)".into(),
-    ))
+    let headers = parse_headers(&mut reader)?;
+
+    // TODO(T06): parse markers/journal.
+    // TODO(T07): handle compressed files.
+    let (channels, warnings) = read_interleaved(&mut reader, &headers)?;
+
+    let metadata = headers.graph_metadata;
+    let datafile = Datafile {
+        metadata,
+        channels,
+        markers: Vec::new(),
+        journal: None,
+    };
+    Ok(ParseResult {
+        value: datafile,
+        warnings,
+    })
 }
 
 #[cfg(feature = "std")]

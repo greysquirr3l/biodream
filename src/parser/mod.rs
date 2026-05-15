@@ -10,7 +10,7 @@
 
 #[cfg(feature = "read")]
 pub mod headers;
-// TODO(T05): implement streaming interleaved reader
+#[cfg(feature = "read")]
 pub mod interleaved;
 
 // TODO(T06): implement marker and journal parser

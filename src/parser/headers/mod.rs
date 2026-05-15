@@ -34,11 +34,11 @@ pub mod dtype;
 pub mod foreign;
 pub mod graph;
 
-use channel::{CHANNEL_HEADER_MIN_LEN, ChannelHeaderRaw, parse_channel_metadata};
-use dtype::{ChannelDtypeRaw, parse_sample_type};
+use channel::{parse_channel_metadata, ChannelHeaderRaw, CHANNEL_HEADER_MIN_LEN};
+use dtype::{parse_sample_type, ChannelDtypeRaw};
 use foreign::ForeignDataRaw;
+use graph::{detect_byte_order, parse_graph_header_post4, parse_graph_header_pre4, REVISION_POST4};
 use graph::{GraphHeaderPost4Raw, GraphHeaderPre4Raw};
-use graph::{REVISION_POST4, detect_byte_order, parse_graph_header_post4, parse_graph_header_pre4};
 
 // ---------------------------------------------------------------------------
 // Output type
@@ -46,16 +46,13 @@ use graph::{REVISION_POST4, detect_byte_order, parse_graph_header_post4, parse_g
 
 /// All header data extracted from a `.acq` file, ready for the data reader.
 #[derive(Debug)]
-#[expect(
-    dead_code,
-    reason = "fields consumed by read_stream once T09 is wired up"
-)]
 pub(crate) struct ParsedHeaders {
     /// Top-level file metadata.
     pub graph_metadata: GraphMetadata,
     /// Per-channel descriptors (one entry per channel).
     pub channel_metadata: Vec<ChannelMetadata>,
     /// Opaque hardware-specific foreign data section.
+    #[cfg_attr(not(test), expect(dead_code, reason = "consumed by T06 marker/journal parser"))]
     pub foreign_data: Vec<u8>,
     /// Sample type for each channel (same length as `channel_metadata`).
     pub sample_types: Vec<SampleType>,
@@ -231,7 +228,7 @@ mod tests {
             ch[8..16].copy_from_slice(&1.0f64.to_le_bytes()); // dAmplScale
             ch[16..24].copy_from_slice(&0.0f64.to_le_bytes()); // dAmplOffset
             ch[24..26].copy_from_slice(&1i16.to_le_bytes()); // nVarSampleDivider
-            // szCommentText: "CH0", "CH1", ...
+                                                             // szCommentText: "CH0", "CH1", ...
             let name = alloc::format!("CH{i}");
             let name_bytes = name.as_bytes();
             let copy_len = name_bytes.len().min(39);

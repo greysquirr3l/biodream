@@ -74,6 +74,13 @@ pub(super) fn parse_channel_metadata(
     // nVarSampleDivider <= 0 means "not set" — treat as base rate (divider = 1).
     let frequency_divider = u16::try_from(raw.var_sample_divider).unwrap_or(1).max(1);
 
+    // lBufLength is signed; negative values mean "not set" — treat as 0.
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "lBufLength clamped to >=0 before cast"
+    )]
+    let sample_count = raw.buf_length.max(0) as u32;
+
     Ok(ChannelMetadata {
         name,
         units,
@@ -82,6 +89,7 @@ pub(super) fn parse_channel_metadata(
         amplitude_scale: raw.ampl_scale,
         amplitude_offset: raw.ampl_offset,
         display_order: channel_index,
+        sample_count,
     })
 }
 

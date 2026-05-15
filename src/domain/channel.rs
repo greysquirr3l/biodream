@@ -65,6 +65,11 @@ pub struct ChannelMetadata {
     pub amplitude_offset: f64,
     /// Display order index.
     pub display_order: u16,
+    /// Expected number of samples for this channel (`lBufLength`).
+    ///
+    /// A value of 0 means the count was not set in the file header; the reader
+    /// will fall back to reading until EOF.
+    pub sample_count: u32,
 }
 
 /// A single physiological signal channel with its sample data.
