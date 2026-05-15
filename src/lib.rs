@@ -183,3 +183,24 @@ pub use api::inspect::InspectReport;
 /// Per-channel header info in an [`InspectReport`].
 #[cfg(feature = "read")]
 pub use api::inspect::ChannelInspect;
+
+// ---------------------------------------------------------------------------
+// Write convenience re-exports
+// ---------------------------------------------------------------------------
+
+/// Write a [`Datafile`] to a `.acq` file using default options (uncompressed, Pre-4).
+///
+/// See [`writer::write_file`] and [`WriteOptions`] for full documentation.
+#[cfg(feature = "write")]
+pub use writer::write_file;
+
+/// Write a [`Datafile`] to any [`std::io::Write`] sink using default options.
+#[cfg(feature = "write")]
+pub use writer::write_stream;
+
+/// Options controlling how a [`Datafile`] is serialised to `.acq` format.
+///
+/// Use builder methods to customise compression, revision, and byte order, then
+/// call [`WriteOptions::write_file`] or [`WriteOptions::write_stream`].
+#[cfg(feature = "write")]
+pub use writer::WriteOptions;

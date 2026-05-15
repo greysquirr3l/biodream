@@ -91,6 +91,41 @@ impl Datafile {
     pub fn summary(&self) -> impl fmt::Display + '_ {
         DatafileSummary(self)
     }
+
+    // ------------------------------------------------------------------
+    // Mutation API (used by the `write` feature to modify recordings)
+    // ------------------------------------------------------------------
+
+    /// Replace the sample data for channel `index`.
+    ///
+    /// Returns [`BiopacError::InvalidChannel`] when `index` is out of range.
+    #[cfg(feature = "write")]
+    pub fn set_channel_data(
+        &mut self,
+        index: usize,
+        data: crate::domain::ChannelData,
+    ) -> Result<(), crate::error::BiopacError> {
+        let ch = self
+            .channels
+            .get_mut(index)
+            .ok_or_else(|| crate::error::BiopacError::InvalidChannel(alloc::format!("{index}")))?;
+        let new_len = data.len();
+        ch.data = data;
+        ch.point_count = new_len;
+        Ok(())
+    }
+
+    /// Append a new marker to the recording.
+    #[cfg(feature = "write")]
+    pub fn add_marker(&mut self, marker: crate::domain::Marker) {
+        self.markers.push(marker);
+    }
+
+    /// Set the journal to a plain-text annotation, replacing any existing journal.
+    #[cfg(feature = "write")]
+    pub fn set_journal(&mut self, text: impl Into<alloc::string::String>) {
+        self.journal = Some(crate::domain::Journal::Plain(text.into()));
+    }
 }
 
 impl fmt::Display for Datafile {

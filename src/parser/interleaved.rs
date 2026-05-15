@@ -56,7 +56,7 @@ const fn lcm(a: u64, b: u64) -> u64 {
 ///
 /// Two channels, dividers `[1, 2]` → LCM=2 → `[0, 1, 0]`
 /// Three channels, dividers `[1, 2, 4]` → LCM=4 → `[0, 1, 2, 0, 0, 1, 0]`
-pub(crate) fn compute_sample_pattern(dividers: &[u16]) -> Vec<usize> {
+pub fn compute_sample_pattern(dividers: &[u16]) -> Vec<usize> {
     if dividers.is_empty() {
         return Vec::new();
     }
