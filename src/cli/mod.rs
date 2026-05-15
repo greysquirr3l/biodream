@@ -35,7 +35,8 @@ const LONG_VERSION: &str = concat!(
     version,
     long_version = LONG_VERSION,
     about = "Read, inspect, and convert BIOPAC AcqKnowledge (.acq) files",
-    long_about = None
+    long_about = None,
+    arg_required_else_help = true,
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -63,7 +64,7 @@ enum Command {
 
 /// Parse the command-line arguments and run the selected subcommand.
 pub fn run() -> anyhow::Result<()> {
-    let cli = Cli::parse();
+    let cli = Cli::try_parse().unwrap_or_else(|e| e.exit());
     match cli.command {
         Command::Info(args) => info::run(&args),
         Command::Convert(args) => convert::run(args),
