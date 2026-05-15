@@ -19,7 +19,14 @@ use markers::MarkersArgs;
 // Top-level CLI struct
 // ---------------------------------------------------------------------------
 
-const LONG_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (git:", env!("GIT_SHA"), ")");
+const LONG_VERSION: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    " (git:",
+    env!("BIODREAM_GIT_SHA"),
+    " ",
+    env!("BIODREAM_GIT_DATE"),
+    ")",
+);
 
 /// biodream CLI — read, inspect, and convert BIOPAC `AcqKnowledge` (.acq) files.
 #[derive(Debug, Parser)]
