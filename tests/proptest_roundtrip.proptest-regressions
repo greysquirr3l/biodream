@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc dbec85ef8bbab0d6c2d53fa747b50149d3087731f21358368512b427f362f423 # shrinks to df = Datafile { metadata: GraphMetadata { file_revision: FileRevision(43), samples_per_second: 1000.0, channel_count: 2, byte_order: LittleEndian, compressed: false, title: None, acquisition_datetime: None, max_samples_per_second: None }, channels: [Channel { name: "A", units: "a", samples_per_second: 1000.0, frequency_divider: 1, data: Raw([0, 0, 0, 0, 0, 0, 0, 0, 0]), point_count: 9 }, Channel { name: "A", units: "a", samples_per_second: 1000.0, frequency_divider: 1, data: Raw([0, 0]), point_count: 2 }], markers: [], journal: None }

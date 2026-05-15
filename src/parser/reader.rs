@@ -26,7 +26,7 @@ use crate::error::{BiopacError, ParseResult, Warning};
 /// Read a `.acq` file from any `Read + Seek` source.
 ///
 /// Returns a [`ParseResult`] that bundles the [`Datafile`] with any
-/// non-fatal [`Warning`](crate::error::Warning)s encountered during parsing.
+/// non-fatal [`Warning`]s encountered during parsing.
 pub fn read_stream<R: Read + Seek>(mut reader: R) -> Result<ParseResult<Datafile>, BiopacError> {
     let headers = parse_headers(&mut reader)?;
 

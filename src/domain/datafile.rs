@@ -98,7 +98,7 @@ impl Datafile {
 
     /// Replace the sample data for channel `index`.
     ///
-    /// Returns [`BiopacError::InvalidChannel`] when `index` is out of range.
+    /// Returns `BiopacError::InvalidChannel` when `index` is out of range.
     #[cfg(feature = "write")]
     pub fn set_channel_data(
         &mut self,

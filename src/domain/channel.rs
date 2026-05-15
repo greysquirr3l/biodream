@@ -112,8 +112,7 @@ impl Channel {
     /// If `self.samples_per_second` already equals `base_rate`, the scaled
     /// samples are returned unchanged (no copy of raw data is made until then).
     ///
-    /// Uses [`core::slice::array_windows`] (stable 1.94) for the sliding-window
-    /// linear-interpolation pass.
+    /// Uses a sliding-window linear-interpolation pass internally.
     pub fn upsampled(&self, base_rate: f64) -> Vec<f64> {
         let src = self.scaled_samples();
 

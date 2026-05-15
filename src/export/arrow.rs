@@ -1,6 +1,6 @@
 //! Apache Arrow IPC export (requires `arrow` feature).
 //!
-//! Produces a single [`RecordBatch`] with a `time_seconds` column (Float64)
+//! Produces a single `RecordBatch` with a `time_seconds` column (Float64)
 //! followed by one Float64 column per channel.  All channels are upsampled to
 //! the base rate using linear interpolation so that every column has the same
 //! length.

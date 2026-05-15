@@ -10,7 +10,7 @@
 //! 3. Journal: `lJournalLen` (i32) followed by that many bytes of text.
 //!
 //! The journal parser is fault-tolerant: corruption produces a
-//! [`Warning`](crate::error::Warning), not an error, and the
+//! [`Warning`], not an error, and the
 //! [`Datafile`](crate::domain::Datafile) is still returned.
 
 use alloc::{string::String, vec, vec::Vec};

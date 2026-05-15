@@ -13,8 +13,8 @@
 //!
 //! # Usage
 //!
-//! Call [`parse_headers`] with any `Read + Seek` reader to obtain a
-//! [`ParsedHeaders`] value containing all domain metadata and the byte offset
+//! Call `parse_headers` with any `Read + Seek` reader to obtain a
+//! `ParsedHeaders` value containing all domain metadata and the byte offset
 //! at which channel data begins.
 
 use alloc::vec::Vec;

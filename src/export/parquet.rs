@@ -1,8 +1,8 @@
 //! Parquet export (requires `parquet` feature, builds on `arrow`).
 //!
 //! Writes a single row-group Parquet file from a [`crate::domain::Datafile`].
-//! The Parquet schema mirrors the Arrow schema produced by
-//! [`crate::export::arrow::build_record_batch`]; file-level and per-channel
+//! The Parquet schema mirrors the Arrow schema produced by the Arrow export
+//! module; file-level and per-channel
 //! metadata are preserved via schema metadata key–value pairs.
 //!
 //! ZSTD compression is applied at the configurable level (default: 3).

@@ -2,11 +2,11 @@
 //!
 //! # Module layout
 //!
-//! - [`headers`] — raw `binrw` structs mirroring the on-disk layout (T04)
-//! - [`interleaved`] — streaming reader for uncompressed channel data (T05)
-//! - [`markers`] — marker and journal section parser (T06)
-//! - [`compressed`] — per-channel zlib decompression (T07)
-//! - [`reader`] — high-level `read_file` / `read_stream` API (T09, requires `std`)
+//! - `headers` — raw `binrw` structs mirroring the on-disk layout
+//! - `interleaved` — streaming reader for uncompressed channel data
+//! - `markers` — marker and journal section parser
+//! - `compressed` — per-channel zlib decompression
+//! - `reader` — high-level `read_file` / `read_stream` API (requires `read` feature)
 
 #[cfg(feature = "read")]
 pub mod headers;

@@ -40,6 +40,7 @@
 //! `alloc`. I/O adapters and export targets require the `std` feature (enabled
 //! transitively by `read`).
 #![no_std]
+#![warn(missing_docs)]
 extern crate alloc;
 
 // Bring std into scope for features that require it.
