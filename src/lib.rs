@@ -1,6 +1,26 @@
 //! biodream — zero-copy, streaming-capable toolkit for reading and writing
 //! BIOPAC `AcqKnowledge` (.acq) files across all known format versions (v30–v84+).
 //!
+//! # Quick start
+//!
+//! ```rust,ignore
+//! // Read a file in one call
+//! let df = biodream::read_file("recording.acq")?.into_value();
+//! println!("{}", df.summary());
+//!
+//! // Lazy: parse headers without loading sample data
+//! let lazy = biodream::open_file("recording.acq")?;
+//! println!("{} channels", lazy.channel_count());
+//! let ecg = lazy.load_channel(0)?;
+//!
+//! // Filter to specific channels
+//! let df = biodream::ReadOptions::new()
+//!     .channels(&[0, 2])
+//!     .scaled(true)
+//!     .read_file("recording.acq")?
+//!     .into_value();
+//! ```
+//!
 //! # Feature flags
 //!
 //! | Feature | Default | Description |
@@ -32,6 +52,10 @@ pub mod error;
 /// Binary parser for .acq files. Requires the `read` feature for I/O.
 pub mod parser;
 
+/// High-level ergonomic API: `ReadOptions` and `LazyDatafile`.
+#[cfg(feature = "read")]
+pub mod api;
+
 #[cfg(feature = "write")]
 pub mod writer;
 
@@ -49,3 +73,52 @@ pub use domain::{
     Journal, Marker, MarkerStyle, Timestamp,
 };
 pub use error::{BiopacError, ParseResult, Warning};
+
+// Re-export the ergonomic API types at crate root.
+#[cfg(feature = "read")]
+pub use api::{LazyDatafile, ReadOptions};
+
+// ---------------------------------------------------------------------------
+// Top-level convenience functions
+// ---------------------------------------------------------------------------
+
+/// Read a `.acq` file from the filesystem.
+///
+/// Both compressed and uncompressed files are handled transparently.
+/// Returns a [`ParseResult`] containing the [`Datafile`] and any non-fatal
+/// [`Warning`]s.
+///
+/// For more control over which channels are loaded or whether samples are
+/// scaled, use [`ReadOptions`].
+#[cfg(feature = "read")]
+pub fn read_file(path: impl AsRef<std::path::Path>) -> Result<ParseResult<Datafile>, BiopacError> {
+    parser::reader::read_file(path)
+}
+
+/// Parse a `.acq` file from an in-memory byte slice.
+///
+/// Useful for WASM and embedded contexts where filesystem access is
+/// unavailable.
+#[cfg(feature = "read")]
+pub fn read_bytes(bytes: &[u8]) -> Result<ParseResult<Datafile>, BiopacError> {
+    parser::reader::read_bytes(bytes)
+}
+
+/// Read a `.acq` file from any [`std::io::Read`] + [`std::io::Seek`] source.
+#[cfg(feature = "read")]
+pub fn read_stream<R: std::io::Read + std::io::Seek>(
+    reader: R,
+) -> Result<ParseResult<Datafile>, BiopacError> {
+    parser::reader::read_stream(reader)
+}
+
+/// Open a `.acq` file for lazy channel access.
+///
+/// Headers and markers are parsed immediately. Channel sample data is only
+/// read when first requested via [`LazyDatafile::load_channel`].
+///
+/// See also: [`read_file`] for loading all data at once.
+#[cfg(feature = "read")]
+pub fn open_file(path: impl AsRef<std::path::Path>) -> Result<LazyDatafile, BiopacError> {
+    api::open_file(path)
+}

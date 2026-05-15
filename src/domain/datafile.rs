@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use crate::domain::{Channel, GraphMetadata, Journal, Marker};
+use crate::domain::{Channel, FileRevision, GraphMetadata, Journal, Marker};
 
 /// A fully parsed BIOPAC `AcqKnowledge` recording.
 ///
@@ -46,6 +46,45 @@ impl Datafile {
     /// Total number of markers.
     pub const fn marker_count(&self) -> usize {
         self.markers.len()
+    }
+
+    /// Look up a channel by name (ergonomic alias for [`Datafile::channel_by_name`]).
+    pub fn channel(&self, name: &str) -> Option<&Channel> {
+        self.channel_by_name(name)
+    }
+
+    /// Iterate over all channels in file order.
+    pub fn channels(&self) -> impl Iterator<Item = &Channel> {
+        self.channels.iter()
+    }
+
+    /// The file's revision number.
+    pub const fn revision(&self) -> FileRevision {
+        self.metadata.file_revision
+    }
+
+    /// Base sampling rate as defined in the graph header (samples per second).
+    pub const fn samples_per_second(&self) -> f64 {
+        self.metadata.samples_per_second
+    }
+
+    /// Duration of the recording in seconds, computed from the longest channel.
+    ///
+    /// Returns `None` if there are no channels or all channels have zero
+    /// samples.
+    pub fn duration(&self) -> Option<f64> {
+        self.channels
+            .iter()
+            .filter(|ch| ch.samples_per_second > 0.0 && ch.point_count > 0)
+            .map(|ch| {
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "point_count is a sample index; precision loss is negligible for physiological recordings"
+                )]
+                let count = ch.point_count as f64;
+                count / ch.samples_per_second
+            })
+            .reduce(f64::max)
     }
 
     /// Returns a summary suitable for display or logging.

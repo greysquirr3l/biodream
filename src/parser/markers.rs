@@ -480,7 +480,7 @@ mod tests {
         let mut bytes = Vec::<u8>::new();
         bytes.extend_from_slice(&write_i32_le(8)); // total length = just the header
         bytes.extend_from_slice(&write_i32_le(0)); // 0 markers
-                                                   // No journal — EOF
+        // No journal — EOF
 
         let mut cur = Cursor::new(&bytes[..]);
         let result = parse_markers_and_journal(&mut cur, 73, &[])?;

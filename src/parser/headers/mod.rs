@@ -69,6 +69,28 @@ pub(crate) struct ParsedHeaders {
     pub warnings: Vec<Warning>,
 }
 
+impl ParsedHeaders {
+    /// Total byte count of the uncompressed interleaved data block.
+    ///
+    /// Returns `None` if any channel has `sample_count == 0` (meaning the
+    /// count was not recorded in the file header — common in some older files)
+    /// or if the computation overflows.
+    pub(crate) fn uncompressed_data_byte_count(&self) -> Option<u64> {
+        self.channel_metadata
+            .iter()
+            .zip(self.sample_types.iter())
+            .try_fold(0u64, |acc, (meta, st)| {
+                if meta.sample_count == 0 {
+                    None
+                } else {
+                    let channel_bytes =
+                        u64::from(meta.sample_count).checked_mul(st.byte_size() as u64)?;
+                    acc.checked_add(channel_bytes)
+                }
+            })
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Channel extended-description constants
 // ---------------------------------------------------------------------------
