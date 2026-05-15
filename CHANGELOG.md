@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-15
+
+### Added
+
+- **CLI**: `biopac plot <file.acq>` — renders channel waveforms as a tiled PNG
+  or SVG image using [plotters](https://github.com/plotters-rs/plotters).
+  Supports `--output`, `--format png|svg`, `--width`, `--height-per-channel`,
+  `--channels` (by name or 0-based index), and `--start`/`--end` time-window
+  clipping. Gated behind the optional `plot` feature.
+
+### Fixed
+
+- **CI**: Four clippy lint errors in `examples/write_file.rs`
+  (`single_match_else`, `option_if_let_else`, `cast_precision_loss` ×2) that
+  were causing the `Lint` job to fail since the `write` feature was added.
+- **CI**: `build.rs` triggered `clippy::map_unwrap_or`; replaced
+  `.map(…).unwrap_or(false)` with `is_ok_and(…)`.
+- **CI**: Removed stale `RUSTSEC-2024-0436` ignore from `deny.toml` — arrow 58
+  no longer pulls in `paste` via `ahash`, so the entry caused a
+  `warning[advisory-not-detected]` in `cargo-deny`.
+
 ## [0.2.1] - 2026-05-15
 
 ### Added
