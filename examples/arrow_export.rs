@@ -55,7 +55,9 @@ fn run() {
         Ok(()) => eprintln!(
             "Wrote {} channels ({} rows) to {output}",
             df.channels.len(),
-            df.channels.first().map_or(0, |ch| ch.scaled_samples().len()),
+            df.channels
+                .first()
+                .map_or(0, |ch| ch.scaled_samples().len()),
         ),
         Err(e) => {
             eprintln!("Arrow export failed: {e}");

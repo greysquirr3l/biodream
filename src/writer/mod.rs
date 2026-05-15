@@ -271,7 +271,12 @@ fn write_pre4_graph_header<W: Write>(
     let chan_hdr_len = i16::try_from(CHAN_HDR_LEN).unwrap_or(i16::MAX);
 
     put_i32(&mut buf, 2, revision, le); // lVersion (offset 2)
-    put_i32(&mut buf, 6, i32::try_from(PRE4_GRAPH_HDR_LEN).unwrap_or(i32::MAX), le); // lExtItemHeaderLen (offset 6, = 256)
+    put_i32(
+        &mut buf,
+        6,
+        i32::try_from(PRE4_GRAPH_HDR_LEN).unwrap_or(i32::MAX),
+        le,
+    ); // lExtItemHeaderLen (offset 6, = 256)
     put_i16(&mut buf, 10, n_ch, le); // nChannels (offset 10)
     // offsets 12-15: nHorizAxisType, nCurrChannel = 0 (already zero)
     put_f64(&mut buf, 16, sample_time_ms, le); // dSampleTime (offset 16)
