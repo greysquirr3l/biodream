@@ -11,6 +11,16 @@ updates:
     open-pull-requests-limit: 10
     # Group all cargo updates into a single PR (one for minor/patch, one for major).
     groups:
+      # Arrow and Parquet crates must always be updated together — they are
+      # tightly coupled and mixing major versions causes type mismatches.
+      arrow-parquet:
+        patterns:
+          - "arrow*"
+          - "parquet"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
       cargo-dependencies:
         update-types:
           - "minor"
