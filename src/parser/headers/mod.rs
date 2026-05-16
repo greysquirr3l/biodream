@@ -34,12 +34,12 @@ pub mod dtype;
 pub mod foreign;
 pub mod graph;
 
-use channel::{ChannelHeaderRaw, parse_channel_metadata};
-use dtype::{ChannelDtypeRaw, parse_sample_type};
+use channel::{parse_channel_metadata, ChannelHeaderRaw};
+use dtype::{parse_sample_type, ChannelDtypeRaw};
 use foreign::ForeignDataRaw;
 use graph::{
-    GraphHeaderPost4Raw, GraphHeaderPre4Raw, REVISION_POST4, detect_byte_order,
-    parse_graph_header_post4, parse_graph_header_pre4,
+    detect_byte_order, parse_graph_header_post4, parse_graph_header_pre4, GraphHeaderPost4Raw,
+    GraphHeaderPre4Raw, REVISION_POST4,
 };
 
 // ---------------------------------------------------------------------------
@@ -370,9 +370,9 @@ mod tests {
         gh[2..6].copy_from_slice(&version.to_le_bytes()); // lVersion at offset 2
         gh[6..10].copy_from_slice(&256i32.to_le_bytes()); // lExtItemHeaderLen = 256 at offset 6
         gh[10..12].copy_from_slice(&(n_channels as i16).to_le_bytes()); // nChannels at offset 10
-        // offsets 12-15: horiz/curr = 0
+                                                                        // offsets 12-15: horiz/curr = 0
         gh[16..24].copy_from_slice(&sample_time_ms.to_le_bytes()); // dSampleTime at offset 16
-        // offsets 24-251 = 0
+                                                                   // offsets 24-251 = 0
         gh[252..254].copy_from_slice(&chan_header_len.to_le_bytes()); // nExtItemHeaderLen at offset 252
         buf.extend_from_slice(&gh);
 
@@ -380,8 +380,8 @@ mod tests {
         for i in 0..n_channels {
             let mut ch = [0u8; 252];
             ch[0..4].copy_from_slice(&252i32.to_le_bytes()); // lChanHeaderLen
-            // offset 4-5: nNum = 0
-            // szCommentText: "CH0", "CH1", ... at offset 6
+                                                             // offset 4-5: nNum = 0
+                                                             // szCommentText: "CH0", "CH1", ... at offset 6
             let name = alloc::format!("CH{i}");
             let name_bytes = name.as_bytes();
             let copy_len = name_bytes.len().min(39);
@@ -450,12 +450,14 @@ mod tests {
         reason = "buf constructed by make_pre4_acq with known layout; fd_offset is within bounds"
     )]
     fn parse_headers_foreign_data_preserved() -> Result<(), Box<dyn std::error::Error>> {
-        // Build Pre-4 file with 4 bytes of foreign data.
+        // Build Pre-4 file with 4 bytes of foreign payload.
         let mut buf = make_pre4_acq(1, 1.0);
-        // Patch the foreign-data section: nLength at offset 256+252=508
+        // Patch foreign-data section at offset 256+252=508.
+        // nLength is the TOTAL section size (including the 4-byte length field).
+        // nLength = 8 → total 8 bytes consumed (4-byte length + 4-byte payload).
         let fd_offset = 256 + 252;
-        buf[fd_offset..fd_offset + 4].copy_from_slice(&4i32.to_le_bytes());
-        // Insert the 4 payload bytes BEFORE the dtype header.
+        buf[fd_offset..fd_offset + 4].copy_from_slice(&8i32.to_le_bytes());
+        // Insert the 4 payload bytes after the length field, before the dtype header.
         buf.splice(fd_offset + 4..fd_offset + 4, [0xAA, 0xBB, 0xCC, 0xDD]);
 
         let mut cursor = Cursor::new(&buf);
@@ -483,7 +485,7 @@ mod tests {
         gh[2..6].copy_from_slice(&38i32.to_le_bytes()); // lVersion = 38 at offset 2
         gh[6..10].copy_from_slice(&256i32.to_le_bytes()); // lExtItemHeaderLen = 256 at offset 6
         gh[10..12].copy_from_slice(&1i16.to_le_bytes()); // 1 channel at offset 10
-        // offsets 12-15: horiz/curr = 0
+                                                         // offsets 12-15: horiz/curr = 0
         gh[16..24].copy_from_slice(&1.0f64.to_le_bytes()); // 1 ms -> 1000 Hz at offset 16
         gh[252..254].copy_from_slice(&(chan_header_len as i16).to_le_bytes());
         buf.extend_from_slice(&gh);
@@ -532,8 +534,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_headers_channel_no_description_when_header_short()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn parse_headers_channel_no_description_when_header_short(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // The standard pre4 helper uses chan_header_len=252 (>= 168), but we
         // write a blank description at offset 128 — so we expect an empty string.
         let buf = make_pre4_acq(1, 1.0);
