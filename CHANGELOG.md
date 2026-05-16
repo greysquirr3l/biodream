@@ -7,7 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.5] - 2026-05-16
+### Changed
+
+- **CI**: added an optional HDF5 feature job to `.github/workflows/ci.yml`.
+  The job now probes for a system HDF5 library via `pkg-config` and runs
+  `cargo test -p biodream --features hdf5` only when available; otherwise it
+  emits an explicit skip notice instead of failing.
+
+- **Docs**: expanded HDF5 installation guidance with `HDF5_DIR` and
+  `PKG_CONFIG_PATH` overrides plus a `pkg-config` verification command.
+
+## [0.2.6] - 2026-05-16
+
+### Added
+
+- **`biopac info` — lazy header load**: for file-path arguments, `info` now
+  uses `LazyDatafile` (headers + markers only) instead of reading all sample
+  data. Channel sample-rate is derived from `frequency_divider`; `--json`
+  output includes `duration_seconds` computed from sample counts.
+
+- **`biopac markers` — lazy header load**: same optimisation as `info`; for
+  file-path arguments, markers are read via `LazyDatafile.markers` without
+  loading any sample data. Stdin input continues to use the full `read_acq`
+  path.
+
+- **`biopac convert` — channel selection by name**:
+  - `--channel-name <NAME>` — select channels by exact name; may be specified
+    multiple times. Resolves indices via a lazy header scan.
+  - `--channel-contains <NEEDLE>` — select the first channel whose name
+    contains the substring (case-insensitive). Resolves indices via a lazy
+    header scan. Conflicts with `--channels` and `--channel-name`.
+
+- **`biopac convert` — CSV output options**: the CSV export now exposes the
+  full `CsvOptions` surface through CLI flags:
+  - `--time-format <seconds|milliseconds|hms>` — time-column format
+    (default: `seconds`)
+  - `--precision <N>` — decimal places for float values (default: `6`)
+  - `--delimiter <CHAR>` — field separator; accepts a single ASCII character
+    or `tab` (default: `,`)
+  - `--include-raw` — emit a `<name>_raw` integer column alongside each
+    scaled column
+  - `--fill-value <STR>` — value written for absent samples (default: empty
+    string)
+
+- **`biopac signals` subcommand** (`--features physio`): new command group for
+  physiological signal processing:
+  - `biopac signals detect-peaks --channel <IDX> --fs <HZ> [--json]` —
+    loads one ECG channel, runs the Pan-Tompkins R-peak detector, and prints
+    each peak as `sample<TAB>time_s` (or JSON array).
+  - `biopac signals ptt --ecg <IDX> --ppg <IDX> --fs <HZ> [--json]` — loads
+    ECG and PPG channels, computes per-beat PTT, and prints a summary table
+    with median PTT and mean heart rate (or JSON object).
 
 ### Added
 

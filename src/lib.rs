@@ -168,6 +168,18 @@ pub use export::parquet::to_parquet;
 pub use export::parquet::ParquetOptions;
 
 // ---------------------------------------------------------------------------
+// HDF5 export convenience re-exports
+// ---------------------------------------------------------------------------
+
+/// Export a [`Datafile`] as an HDF5 file.
+#[cfg(feature = "hdf5")]
+pub use export::hdf5::to_hdf5;
+
+/// Options for HDF5 export.
+#[cfg(feature = "hdf5")]
+pub use export::hdf5::Hdf5Options;
+
+// ---------------------------------------------------------------------------
 // Inspect API — parse headers only, no sample data loaded
 // ---------------------------------------------------------------------------
 

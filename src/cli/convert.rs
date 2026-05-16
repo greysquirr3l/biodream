@@ -1,4 +1,4 @@
-//! `biopac convert` — export a .acq file to CSV, Arrow IPC, or Parquet.
+//! `biopac convert` — export a .acq file to CSV, Arrow IPC, Parquet, or HDF5.
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -48,6 +48,10 @@ pub enum OutputFormat {
     Arrow,
     /// Apache Parquet columnar format.
     Parquet,
+    /// HDF5 container.
+    Hdf5,
+    /// MATLAB v7.3-compatible HDF5 container.
+    Mat,
 }
 
 /// Arguments for the `convert` subcommand.
@@ -63,7 +67,7 @@ pub struct ConvertArgs {
     #[arg(short, long, value_name = "OUTPUT")]
     pub output: Option<PathBuf>,
 
-    /// Output format: csv, arrow, or parquet. Inferred from the output
+    /// Output format: csv, arrow, parquet, hdf5, or mat. Inferred from the output
     /// file extension when not specified.
     #[arg(short = 'F', long, value_name = "FORMAT")]
     pub format: Option<OutputFormat>,
@@ -132,10 +136,7 @@ pub fn run(args: ConvertArgs) -> anyhow::Result<()> {
     let result = read_with_options(&args.path, channel_indices.as_deref(), args.scaled)?;
     let df = result.value;
 
-    let file = File::create(&output_path)
-        .with_context(|| format!("failed to create {}", output_path.display()))?;
-
-    write_output(format, &df, file, &csv_opts)
+    write_output(format, &df, &output_path, &csv_opts)
 }
 
 // ---------------------------------------------------------------------------
@@ -280,14 +281,16 @@ pub fn resolve_format(
         .to_ascii_lowercase();
 
     match ext.as_str() {
-        "csv" => Ok(OutputFormat::Csv),
+        "csv" | "txt" | "tsv" => Ok(OutputFormat::Csv),
         "arrow" | "ipc" => Ok(OutputFormat::Arrow),
         "parquet" | "pq" => Ok(OutputFormat::Parquet),
+        "h5" | "hdf5" => Ok(OutputFormat::Hdf5),
+        "mat" => Ok(OutputFormat::Mat),
         // Default to CSV when the extension is the .acq input itself.
         _ if output.is_none() => Ok(OutputFormat::Csv),
         other => anyhow::bail!(
             "cannot infer output format from extension '.{other}'; \
-             use --format csv|arrow|parquet"
+             use --format csv|arrow|parquet|hdf5|mat"
         ),
     }
 }
@@ -309,6 +312,8 @@ fn resolve_output_path(
         OutputFormat::Csv => "csv",
         OutputFormat::Arrow => "arrow",
         OutputFormat::Parquet => "parquet",
+        OutputFormat::Hdf5 => "h5",
+        OutputFormat::Mat => "mat",
     };
 
     // file_prefix() (stable 1.91) returns the stem before the first dot.
@@ -321,28 +326,41 @@ fn resolve_output_path(
 fn write_output(
     format: OutputFormat,
     df: &biodream::Datafile,
-    file: File,
+    output_path: &Path,
     csv_opts: &CsvOptions,
 ) -> anyhow::Result<()> {
     match format {
-        OutputFormat::Csv => {
-            let mut w = BufWriter::new(file);
-            biodream::to_csv(df, &mut w, csv_opts).context("CSV export failed")?;
-            w.flush().context("flush failed")
-        }
-        OutputFormat::Arrow => write_arrow(df, BufWriter::new(file)),
-        OutputFormat::Parquet => write_parquet(df, BufWriter::new(file)),
+        OutputFormat::Csv => write_csv(df, output_path, csv_opts),
+        OutputFormat::Arrow => write_arrow(df, output_path),
+        OutputFormat::Parquet => write_parquet(df, output_path),
+        OutputFormat::Hdf5 => write_hdf5(df, output_path),
+        OutputFormat::Mat => write_mat(df, output_path),
     }
 }
 
+fn write_csv(
+    df: &biodream::Datafile,
+    output_path: &Path,
+    csv_opts: &CsvOptions,
+) -> anyhow::Result<()> {
+    let file = File::create(output_path)
+        .with_context(|| format!("failed to create {}", output_path.display()))?;
+    let mut w = BufWriter::new(file);
+    biodream::to_csv(df, &mut w, csv_opts).context("CSV export failed")?;
+    w.flush().context("flush failed")
+}
+
 #[cfg(any(feature = "arrow", feature = "parquet"))]
-fn write_arrow<W: Write>(df: &biodream::Datafile, mut writer: W) -> anyhow::Result<()> {
+fn write_arrow(df: &biodream::Datafile, output_path: &Path) -> anyhow::Result<()> {
+    let file = File::create(output_path)
+        .with_context(|| format!("failed to create {}", output_path.display()))?;
+    let mut writer = BufWriter::new(file);
     biodream::to_arrow_ipc(df, &mut writer).context("Arrow IPC export failed")?;
     writer.flush().context("flush failed")
 }
 
 #[cfg(not(any(feature = "arrow", feature = "parquet")))]
-fn write_arrow<W: Write>(_df: &biodream::Datafile, _writer: W) -> anyhow::Result<()> {
+fn write_arrow(_df: &biodream::Datafile, _output_path: &Path) -> anyhow::Result<()> {
     anyhow::bail!(
         "Arrow IPC export requires the 'arrow' feature; \
          recompile with: cargo build --features arrow"
@@ -350,17 +368,40 @@ fn write_arrow<W: Write>(_df: &biodream::Datafile, _writer: W) -> anyhow::Result
 }
 
 #[cfg(feature = "parquet")]
-fn write_parquet<W: Write + Send>(df: &biodream::Datafile, writer: W) -> anyhow::Result<()> {
+fn write_parquet(df: &biodream::Datafile, output_path: &Path) -> anyhow::Result<()> {
+    let file = File::create(output_path)
+        .with_context(|| format!("failed to create {}", output_path.display()))?;
+    let writer = BufWriter::new(file);
     biodream::to_parquet(df, writer, &biodream::ParquetOptions::default())
         .context("Parquet export failed")
 }
 
 #[cfg(not(feature = "parquet"))]
-fn write_parquet<W: Write + Send>(_df: &biodream::Datafile, _writer: W) -> anyhow::Result<()> {
+fn write_parquet(_df: &biodream::Datafile, _output_path: &Path) -> anyhow::Result<()> {
     anyhow::bail!(
         "Parquet export requires the 'parquet' feature; \
          recompile with: cargo build --features parquet"
     )
+}
+
+#[cfg(feature = "hdf5")]
+fn write_hdf5(df: &biodream::Datafile, output_path: &Path) -> anyhow::Result<()> {
+    biodream::to_hdf5(df, output_path, &biodream::Hdf5Options::default())
+        .with_context(|| format!("HDF5 export failed: {}", output_path.display()))
+}
+
+#[cfg(not(feature = "hdf5"))]
+fn write_hdf5(_df: &biodream::Datafile, _output_path: &Path) -> anyhow::Result<()> {
+    anyhow::bail!(
+        "HDF5 export requires the 'hdf5' feature; \
+         recompile with: cargo build --features hdf5"
+    )
+}
+
+fn write_mat(df: &biodream::Datafile, output_path: &Path) -> anyhow::Result<()> {
+    // MATLAB v7.3 files are HDF5 containers. We emit the same layout as `hdf5`
+    // and let the `.mat` extension drive downstream tooling.
+    write_hdf5(df, output_path)
 }
 
 // ---------------------------------------------------------------------------
@@ -383,6 +424,22 @@ mod tests {
     fn resolve_format_from_output_extension() -> anyhow::Result<()> {
         let f = resolve_format(None, Path::new("a.acq"), Some(Path::new("out.parquet")))?;
         assert_eq!(f, OutputFormat::Parquet);
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_format_hdf5_extensions() -> anyhow::Result<()> {
+        let a = resolve_format(None, Path::new("a.acq"), Some(Path::new("out.h5")))?;
+        let b = resolve_format(None, Path::new("a.acq"), Some(Path::new("out.hdf5")))?;
+        assert_eq!(a, OutputFormat::Hdf5);
+        assert_eq!(b, OutputFormat::Hdf5);
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_format_mat_extension() -> anyhow::Result<()> {
+        let f = resolve_format(None, Path::new("a.acq"), Some(Path::new("out.mat")))?;
+        assert_eq!(f, OutputFormat::Mat);
         Ok(())
     }
 
@@ -425,5 +482,19 @@ mod tests {
     fn resolve_output_path_stdin_without_explicit_errors() {
         let r = resolve_output_path(None, Path::new("-"), OutputFormat::Csv);
         assert!(r.is_err());
+    }
+
+    #[test]
+    fn resolve_output_path_derives_hdf5_from_input() -> anyhow::Result<()> {
+        let p = resolve_output_path(None, Path::new("data.acq"), OutputFormat::Hdf5)?;
+        assert_eq!(p, PathBuf::from("data.h5"));
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_output_path_derives_mat_from_input() -> anyhow::Result<()> {
+        let p = resolve_output_path(None, Path::new("data.acq"), OutputFormat::Mat)?;
+        assert_eq!(p, PathBuf::from("data.mat"));
+        Ok(())
     }
 }

@@ -136,3 +136,37 @@ jobs:
         run: >
           cargo check --workspace
           --features "read,write,csv,arrow,parquet,serde,plot"
+
+  hdf5:
+    name: Optional HDF5 Feature
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry and build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check for HDF5 system library
+        id: hdf5_check
+        shell: bash
+        run: |
+          set -euo pipefail
+          if pkg-config --exists hdf5; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "HDF5 available via pkg-config: $(pkg-config --modversion hdf5)"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "HDF5 not available on runner; HDF5 feature checks will be skipped"
+          fi
+
+      - name: Test with hdf5 feature
+        if: steps.hdf5_check.outputs.available == 'true'
+        run: cargo test -p biodream --features "hdf5"
+
+      - name: Skip notice
+        if: steps.hdf5_check.outputs.available != 'true'
+        run: |
+          echo "Skipped: HDF5 system library not found on this runner"

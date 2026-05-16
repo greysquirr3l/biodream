@@ -57,3 +57,19 @@ brew install hdf5
 
 # Windows: download from https://www.hdfgroup.org/downloads/hdf5/
 ```
+
+If the HDF5 library is installed in a non-default location, set one of:
+
+```sh
+# Preferred: point directly at the HDF5 installation root
+export HDF5_DIR="/path/to/hdf5"
+
+# Alternative: make pkg-config aware of HDF5
+export PKG_CONFIG_PATH="/path/to/hdf5/lib/pkgconfig:${PKG_CONFIG_PATH}"
+```
+
+Quick verification:
+
+```sh
+pkg-config --modversion hdf5 || echo "hdf5 not found via pkg-config"
+```

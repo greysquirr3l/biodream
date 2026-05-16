@@ -1,6 +1,6 @@
 [package]
 name = "biodream"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2024"
 rust-version = "1.95.0"
 description = "Zero-copy, streaming-capable toolkit for reading and writing BIOPAC AcqKnowledge (.acq) files"
@@ -39,8 +39,8 @@ arrow = ["read", "dep:arrow-array", "dep:arrow-schema", "dep:arrow-ipc"]
 # Parquet export (builds on Arrow).
 parquet = ["arrow", "dep:parquet"]
 
-# HDF5 export — requires libhdf5-dev system library; added in T11.
-hdf5 = []
+# HDF5 export — requires libhdf5-dev system library.
+hdf5 = ["read", "dep:hdf5"]
 
 # Serde derive support for domain types.
 serde = ["dep:serde"]
@@ -78,6 +78,9 @@ arrow-ipc = { version = "58", optional = true }
 
 # Parquet export.
 parquet = { version = "58", optional = true }
+
+# HDF5 export.
+hdf5 = { version = "0.8", optional = true }
 
 # Waveform image rendering.
 plotters = { version = "0.3", optional = true, default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "all_series"] }

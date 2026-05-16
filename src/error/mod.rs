@@ -69,6 +69,13 @@ pub enum BiopacError {
     #[cfg(feature = "parquet")]
     #[error("parquet error: {0}")]
     Parquet(#[from] parquet::errors::ParquetError),
+
+    /// An HDF5 serialisation error.
+    ///
+    /// Only available with the `hdf5` feature.
+    #[cfg(feature = "hdf5")]
+    #[error("hdf5 error: {0}")]
+    Hdf5(#[from] hdf5::Error),
 }
 
 // Compile-time assertion: BiopacError is Send + Sync so it can flow across
