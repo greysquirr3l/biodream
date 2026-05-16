@@ -9,6 +9,10 @@ ignore = [
     # parquet 58.x. No patched version exists and the dep is not actionable
     # until the Apache Arrow project removes it.
     { id = "RUSTSEC-2024-0436", reason = "transitive via parquet; no patched version available" },
+    # instant 0.1.x is unmaintained; pulled transitively by hdf5 0.8.x via
+    # parking_lot. No safe upgrade path is currently available in hdf5's
+    # dependency graph.
+    { id = "RUSTSEC-2024-0384", reason = "transitive via hdf5/parking_lot; no patched version available" },
 ]
 
 [licenses]
