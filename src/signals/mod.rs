@@ -438,10 +438,18 @@ mod tests {
     #[test]
     fn sync_window_two_pulses() {
         let mut sig = vec![0.0_f64; 1000];
-        sig[100] = 1.0;
-        sig[101] = 1.0;
-        sig[800] = 1.0;
-        sig[801] = 1.0;
+        if let Some(v) = sig.get_mut(100) {
+            *v = 1.0;
+        }
+        if let Some(v) = sig.get_mut(101) {
+            *v = 1.0;
+        }
+        if let Some(v) = sig.get_mut(800) {
+            *v = 1.0;
+        }
+        if let Some(v) = sig.get_mut(801) {
+            *v = 1.0;
+        }
         let (start, end) = sync_window(&sig, 0.5);
         assert_eq!(start, 100);
         assert_eq!(end, 800);
@@ -465,13 +473,18 @@ mod tests {
         for &p in &peak_positions {
             // Narrow Gaussian-ish spike
             for di in 0_usize..30 {
+                #[expect(clippy::cast_precision_loss)]
                 let dist = di as f64;
                 let val = (-0.5 * (dist / 5.0).powi(2)).exp();
-                if p + di < n {
-                    ecg[p + di] += val;
+                if p + di < n
+                    && let Some(v) = ecg.get_mut(p + di)
+                {
+                    *v += val;
                 }
-                if p >= di {
-                    ecg[p - di] += val;
+                if p >= di
+                    && let Some(v) = ecg.get_mut(p - di)
+                {
+                    *v += val;
                 }
             }
         }
@@ -486,7 +499,7 @@ mod tests {
             peaks
         );
         for (&expected, &found) in peak_positions.iter().zip(peaks.iter()) {
-            let diff = (found as isize - expected as isize).unsigned_abs();
+            let diff = found.abs_diff(expected);
             assert!(
                 diff <= 100,
                 "R-peak offset too large: expected ~{expected}, got {found}"
@@ -513,8 +526,8 @@ mod tests {
         let f = [100_usize, 1120, 2080, 3100];
         // PTTs: 100, 120, 80, 100 ms  →  sorted [80, 100, 100, 120]  →  median = 100
         let med = median_ptt(&r, &f, 1000.0);
-        assert!(med.is_some());
-        let m = med.unwrap();
+        let m = med.unwrap_or(f64::NAN);
+        assert!(m.is_finite(), "expected Some median, got None");
         assert!((m - 100.0).abs() < 1.0, "expected median ~100ms, got {m}");
     }
 
@@ -522,7 +535,11 @@ mod tests {
     fn heart_rate_bpm_basic() {
         // R-peaks every 1000 samples at 1000 Hz = 1.0 s RR = 60 BPM
         let peaks: Vec<usize> = (0..6).map(|i| i * 1000).collect();
-        let hr = heart_rate_bpm(&peaks, 1000.0).unwrap();
+        let hr = heart_rate_bpm(&peaks, 1000.0).unwrap_or(f64::NAN);
+        assert!(
+            hr.is_finite(),
+            "expected heart_rate_bpm to return Some, got None"
+        );
         assert!((hr - 60.0).abs() < 0.5, "expected 60 BPM, got {hr}");
     }
 }
