@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-05-16
+
+### Added
+
+- **`physio` feature** — new `biodream::signals` module with pure-Rust
+  physiological signal processing algorithms (no external dependencies,
+  `no_std`-compatible):
+  - `rising_edges` / `falling_edges` — detect digital trigger-pulse edges in
+    a Sync channel by threshold crossing
+  - `sync_window` — returns the `(start, end)` sample span between the first
+    two rising edges; useful for gating analysis to the recording window
+  - `detect_r_peaks` — Pan-Tompkins–inspired QRS R-peak detector (5-point
+    derivative → square → 150 ms moving-window integration → adaptive
+    percentile threshold)
+  - `detect_ppg_feet` — PPG pulse-onset detector (100 ms smoothing →
+    1 s baseline removal → local-minimum search with 300 ms minimum distance)
+  - `beat_ptt` — per-beat pulse-transit time (ms) from ECG R-peaks to the
+    next PPG foot within a configurable search window
+  - `median_ptt` — convenience wrapper returning the median PTT across all
+    matched beats (default search window: 30–380 ms)
+  - `heart_rate_bpm` — mean heart rate in BPM derived from RR intervals,
+    with physiological bounds filtering (0.25–2.0 s)
+
+- **`LazyDatafile::find_channel_by_name`** — returns the zero-based index of
+  the first channel whose name exactly matches the given string without
+  triggering a sample-data load.
+
+- **`LazyDatafile::find_channel_containing`** — case-insensitive substring
+  variant of `find_channel_by_name`; useful when channel names vary slightly
+  across recordings (e.g. `"ECG - Filtered"` vs `"ECG"`).
+
+- **`LazyDatafile::load_channel_by_name`** — loads and returns a channel by
+  exact name; errors include the full list of available channel names.
+
+- **`LazyDatafile::load_channel_containing`** — loads and returns the first
+  channel whose name contains the given substring (case-insensitive).
+
 ## [0.2.4] - 2026-05-16
 
 ### Fixed
@@ -218,6 +255,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MSRV: Rust 1.95.0 (edition 2024, stable toolchain only).
 - Full Clippy `-W pedantic / nursery / cargo / perf` profile with zero warnings.
 
-[Unreleased]: https://github.com/greysquirr3l/biodream/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/greysquirr3l/biodream/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/greysquirr3l/biodream/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/greysquirr3l/biodream/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/greysquirr3l/biodream/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/greysquirr3l/biodream/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/greysquirr3l/biodream/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/greysquirr3l/biodream/releases/tag/v0.1.0

@@ -1,6 +1,6 @@
 [package]
 name = "biodream"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 rust-version = "1.95.0"
 description = "Zero-copy, streaming-capable toolkit for reading and writing BIOPAC AcqKnowledge (.acq) files"
@@ -47,6 +47,10 @@ serde = ["dep:serde"]
 
 # Waveform image generation (PNG / SVG).
 plot = ["read", "dep:plotters"]
+
+# Physiological signal processing: R-peak detection, PPG foot detection,
+# PTT calculation, and Sync-pulse edge detection.  Pure-Rust, no extra deps.
+physio = []
 
 # Default: read + CSV.
 default = ["read", "csv"]

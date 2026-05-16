@@ -33,6 +33,7 @@
 //! | `parquet` | no | Parquet export (requires `arrow`) |
 //! | `hdf5`  | no  | HDF5 export (requires libhdf5-dev) |
 //! | `serde` | no  | Serde derive for domain types |
+//! | `physio` | no | Physiological signal processing (R-peaks, PPG feet, PTT, Sync detection) |
 //!
 //! # `no_std`
 //!
@@ -67,6 +68,10 @@ pub mod writer;
     feature = "hdf5"
 ))]
 pub mod export;
+
+/// Physiological signal processing: R-peak detection, PPG foot detection, PTT.
+#[cfg(feature = "physio")]
+pub mod signals;
 
 // Top-level re-exports for the most commonly used types.
 pub use domain::{

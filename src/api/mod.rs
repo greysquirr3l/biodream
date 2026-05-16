@@ -220,6 +220,66 @@ impl LazyDatafile {
         self.ensure_loaded()
     }
 
+    /// Find the zero-based index of the first channel whose name matches `name`
+    /// (case-sensitive).
+    ///
+    /// This uses only the already-parsed channel metadata and does **not**
+    /// trigger a sample-data load.
+    ///
+    /// Returns `None` if no channel with that name exists.
+    pub fn find_channel_by_name(&self, name: &str) -> Option<usize> {
+        self.channel_metadata.iter().position(|m| m.name == name)
+    }
+
+    /// Find the zero-based index of the first channel whose name contains
+    /// `needle` (case-insensitive substring match).
+    ///
+    /// Useful when channel names include suffixes or vary slightly across
+    /// recordings (e.g. `"ECG - Filtered"` vs `"ECG"`).
+    ///
+    /// Returns `None` if no matching channel is found.
+    pub fn find_channel_containing(&self, needle: &str) -> Option<usize> {
+        let needle_lc = needle.to_lowercase();
+        self.channel_metadata
+            .iter()
+            .position(|m| m.name.to_lowercase().contains(&needle_lc))
+    }
+
+    /// Load a channel by exact name, triggering a data load if necessary.
+    ///
+    /// Equivalent to `find_channel_by_name` + `load_channel`.
+    pub fn load_channel_by_name(&self, name: &str) -> Result<&Channel, BiopacError> {
+        let idx = self.find_channel_by_name(name).ok_or_else(|| {
+            BiopacError::InvalidChannel(alloc::format!(
+                "no channel named {name:?} (channels: {})",
+                self.channel_metadata
+                    .iter()
+                    .map(|m| m.name.as_str())
+                    .collect::<alloc::vec::Vec<_>>()
+                    .join(", ")
+            ))
+        })?;
+        self.load_channel(idx)
+    }
+
+    /// Load a channel by case-insensitive substring match, triggering a data
+    /// load if necessary.
+    ///
+    /// Equivalent to `find_channel_containing` + `load_channel`.
+    pub fn load_channel_containing(&self, needle: &str) -> Result<&Channel, BiopacError> {
+        let idx = self.find_channel_containing(needle).ok_or_else(|| {
+            BiopacError::InvalidChannel(alloc::format!(
+                "no channel with name containing {needle:?} (channels: {})",
+                self.channel_metadata
+                    .iter()
+                    .map(|m| m.name.as_str())
+                    .collect::<alloc::vec::Vec<_>>()
+                    .join(", ")
+            ))
+        })?;
+        self.load_channel(idx)
+    }
+
     /// Consume the `LazyDatafile` and produce a fully-loaded [`Datafile`].
     ///
     /// If sample data has already been loaded this is allocation-free.
