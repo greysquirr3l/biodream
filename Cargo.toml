@@ -1,6 +1,6 @@
 [package]
 name = "biodream"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2024"
 rust-version = "1.95.0"
 description = "Zero-copy, streaming-capable toolkit for reading and writing BIOPAC AcqKnowledge (.acq) files"
