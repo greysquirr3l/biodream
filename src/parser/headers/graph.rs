@@ -56,6 +56,15 @@ const GRAPH_MAX_RATE_OFFSET: u64 = 1940;
 /// Minimum header length to contain the max-rate field (1940 + 4 = 1944).
 const GRAPH_HDR_MAX_RATE_MIN_LEN: i32 = 1944;
 
+/// Byte offset of `hExpectedPaddings` within the Post-4 graph header.
+///
+/// Present in `AcqKnowledge` ≥ 4.3.0 (revision ≥ 124, `V_430`). This i16 field
+/// records how many 40-byte `UnknownPaddingHeader` blocks are interleaved
+/// between the graph header and the first channel header.
+const GRAPH_EXPECTED_PADDINGS_OFFSET: u64 = 2398;
+/// Minimum header length to contain `hExpectedPaddings` (2398 + 2 = 2400).
+const GRAPH_EXPECTED_PADDINGS_MIN_LEN: i32 = 2400;
+
 // ---------------------------------------------------------------------------
 // Byte-order detection
 // ---------------------------------------------------------------------------
@@ -265,6 +274,17 @@ pub(super) struct GraphHeaderPost4Raw {
         seek_before = SeekFrom::Start(GRAPH_MAX_RATE_OFFSET)
     )]
     pub max_acq_samples_per_sec: Option<i32>,
+
+    /// `hExpectedPaddings`: number of 40-byte `UnknownPaddingHeader` blocks
+    /// between this graph header and the first channel header (offset 2398).
+    ///
+    /// Present only in `AcqKnowledge` ≥ 4.3.0 (revision ≥ 124) files where
+    /// `lExtItemHeaderLen >= 2400`.
+    #[br(
+        if(graph_header_len >= GRAPH_EXPECTED_PADDINGS_MIN_LEN),
+        seek_before = SeekFrom::Start(GRAPH_EXPECTED_PADDINGS_OFFSET)
+    )]
+    pub expected_padding_count: Option<i16>,
 }
 
 /// Parse output for a Post-4 graph header.
@@ -273,6 +293,10 @@ pub(super) struct Post4Parsed {
     pub metadata: GraphMetadata,
     /// Total byte length of the graph header (`lExtItemHeaderLen`).
     pub graph_header_len: u64,
+    /// Number of 40-byte `UnknownPaddingHeader` blocks between the graph
+    /// header and the first channel header.  Zero for files pre-dating
+    /// revision 124 (`V_430`).
+    pub expected_padding_count: u16,
 }
 
 /// Convert a raw Post-4 header + detected endian into parsed output.
@@ -326,6 +350,12 @@ pub(super) fn parse_graph_header_post4(
         .max_acq_samples_per_sec
         .and_then(|n| u32::try_from(n).ok());
 
+    let expected_padding_count = raw
+        .expected_padding_count
+        .filter(|&n| n >= 0)
+        .and_then(|n| u16::try_from(n).ok())
+        .unwrap_or(0);
+
     let metadata = GraphMetadata {
         file_revision: FileRevision::new(raw.version),
         samples_per_second: 1000.0 / raw.sample_time_ms,
@@ -340,6 +370,7 @@ pub(super) fn parse_graph_header_post4(
     Ok(Post4Parsed {
         metadata,
         graph_header_len,
+        expected_padding_count,
     })
 }
 

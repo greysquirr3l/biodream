@@ -84,33 +84,36 @@ fn csv_full_pipeline_via_read_bytes() -> Result<(), BiopacError> {
     blob.extend_from_slice(&[0u8; 2]); // [254..256] pad
     assert_eq!(blob.len(), 256);
 
-    // Channel headers
+    // Channel headers (252 bytes each, V_20a layout at correct byte offsets)
     for ch in 0..channels {
         let start = blob.len();
-        blob.extend_from_slice(&chan_hdr_len.to_le_bytes());
-        blob.extend_from_slice(&i32::try_from(n).unwrap_or(0).to_le_bytes());
-        blob.extend_from_slice(&1.0f64.to_le_bytes()); // scale
-        blob.extend_from_slice(&0.0f64.to_le_bytes()); // offset
-        blob.extend_from_slice(&1i16.to_le_bytes()); // divider
+        let mut ch_buf = [0u8; 252];
 
+        // offset 0: lChanHeaderLen = 252
+        ch_buf[0..4].copy_from_slice(&chan_hdr_len.to_le_bytes());
+        // offset 6: szCommentText (channel name)
         let name = format!("CH{ch}");
-        let mut name_bytes = [0u8; 40];
-        let src = name.as_bytes();
-        let len = src.len().min(39);
-        if let (Some(dst), Some(s)) = (name_bytes.get_mut(..len), src.get(..len)) {
-            dst.copy_from_slice(s);
+        let name_src = name.as_bytes();
+        let len = name_src.len().min(39);
+        if let (Some(dst), Some(src)) = (ch_buf.get_mut(6..6 + len), name_src.get(..len)) {
+            dst.copy_from_slice(src);
         }
-        blob.extend_from_slice(&name_bytes);
-
-        let mut units_bytes = [0u8; 20];
-        if let Some(dst) = units_bytes.get_mut(..2) {
+        // offset 68: szUnitsText (2 bytes "mV", rest zero)
+        if let Some(dst) = ch_buf.get_mut(68..70) {
             dst.copy_from_slice(b"mV");
         }
-        blob.extend_from_slice(&units_bytes);
+        // offset 88: lBufLength = n
+        ch_buf[88..92].copy_from_slice(&i32::try_from(n).unwrap_or(0).to_le_bytes());
+        // offset 92: dAmplScale = 1.0
+        ch_buf[92..100].copy_from_slice(&1.0f64.to_le_bytes());
+        // offset 100: dAmplOffset = 0.0
+        ch_buf[100..108].copy_from_slice(&0.0f64.to_le_bytes());
+        // nVarSampleDivider: at offset 250 for Pre-4 V_30r (rev >= 44).
+        // lVersion = 38 < 44, so biodream defaults divider to 1.
+        ch_buf[250..252].copy_from_slice(&1i16.to_le_bytes());
 
-        let consumed = blob.len() - start;
-        let pad = chan_hdr_usize.saturating_sub(consumed);
-        blob.extend(std::iter::repeat_n(0u8, pad));
+        blob.extend_from_slice(&ch_buf);
+
         assert_eq!(blob.len() - start, chan_hdr_usize);
     }
 

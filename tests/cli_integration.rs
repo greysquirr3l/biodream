@@ -33,33 +33,41 @@ fn build_pre4_acq(channels: usize, samples_per_channel: usize) -> Vec<u8> {
     buf.extend_from_slice(&[0u8; 2]); // [254..256] pad
     assert_eq!(buf.len(), 256);
 
-    // Per-channel headers (252 bytes each)
+    // Per-channel headers (252 bytes each, V_20a layout at correct byte offsets)
     for ch in 0..channels {
         let start = buf.len();
-        buf.extend_from_slice(&chan_hdr_len.to_le_bytes());
-        buf.extend_from_slice(&i32::try_from(n).unwrap_or(0).to_le_bytes());
-        buf.extend_from_slice(&1.0f64.to_le_bytes()); // dAmplScale
-        buf.extend_from_slice(&0.0f64.to_le_bytes()); // dAmplOffset
-        buf.extend_from_slice(&1i16.to_le_bytes()); // nVarSampleDivider
+        let mut ch_buf = [0u8; 252];
 
-        let mut name_bytes = [0u8; 40];
+        // offset 0: lChanHeaderLen = 252
+        ch_buf[0..4].copy_from_slice(&chan_hdr_len.to_le_bytes());
+        // offset 6: szCommentText (channel name)
         let name = format!("CH{ch}");
-        let src = name.as_bytes();
-        let len = src.len().min(39);
-        if let (Some(d), Some(s)) = (name_bytes.get_mut(..len), src.get(..len)) {
-            d.copy_from_slice(s);
+        let name_src = name.as_bytes();
+        let len = name_src.len().min(39);
+        if let (Some(dst), Some(src)) = (ch_buf.get_mut(6..6 + len), name_src.get(..len)) {
+            dst.copy_from_slice(src);
         }
-        buf.extend_from_slice(&name_bytes);
-
-        let mut units_bytes = [0u8; 20];
-        if let Some(d) = units_bytes.get_mut(..2) {
-            d.copy_from_slice(b"mV");
+        // offset 68: szUnitsText (2 bytes "mV", rest zero)
+        if let Some(dst) = ch_buf.get_mut(68..70) {
+            dst.copy_from_slice(b"mV");
         }
-        buf.extend_from_slice(&units_bytes);
+        // offset 88: lBufLength = n
+        ch_buf[88..92].copy_from_slice(&i32::try_from(n).unwrap_or(0).to_le_bytes());
+        // offset 92: dAmplScale = 1.0
+        ch_buf[92..100].copy_from_slice(&1.0f64.to_le_bytes());
+        // offset 100: dAmplOffset = 0.0
+        ch_buf[100..108].copy_from_slice(&0.0f64.to_le_bytes());
+        // nVarSampleDivider: at offset 250 for Pre-4 V_30r (rev >= 44).
+        // lVersion = 38 < 44, so biodream defaults divider to 1.
+        ch_buf[250..252].copy_from_slice(&1i16.to_le_bytes());
 
-        let consumed = buf.len() - start;
-        let pad = chan_hdr_usize.saturating_sub(consumed);
-        buf.extend(std::iter::repeat_n(0u8, pad));
+        buf.extend_from_slice(&ch_buf);
+
+        assert_eq!(
+            buf.len() - start,
+            chan_hdr_usize,
+            "channel header must be exactly {chan_hdr_usize} bytes"
+        );
     }
 
     // Foreign data section

@@ -46,7 +46,16 @@ const REVISION_TIMESTAMP: i32 = 77;
 const PRE4_GRAPH_HDR_LEN: usize = 256;
 
 /// Byte length of the channel header written by this library.
-const CHAN_HDR_LEN: usize = 86;
+///
+/// 252 bytes: matches the real BIOPAC Pre-4/Post-4 channel header layout
+/// (`V_20a` base, 112 bytes of required fields + 140 bytes of padding/optional fields).
+const CHAN_HDR_LEN: usize = 252;
+
+/// First Pre-4 revision that stores `nVarSampleDivider` at offset 250 of the channel header.
+const REVISION_V30R: i32 = 44;
+
+/// First revision using the Post-4 format (`AcqKnowledge` 4.0+).
+const REVISION_POST4: i32 = 68;
 
 /// Byte length of the Post-4 graph header written for compressed output.
 ///
@@ -186,7 +195,7 @@ fn write_uncompressed<W: Write>(
 
     // 2. Per-channel headers.
     for ch in &df.channels {
-        write_channel_header(w, ch, le)?;
+        write_channel_header(w, ch, le, opts.revision)?;
     }
 
     // 3. Foreign data section (empty).
@@ -227,7 +236,7 @@ fn write_compressed<W: Write>(
 
     // 2. Per-channel headers.
     for ch in &df.channels {
-        write_channel_header(w, ch, le)?;
+        write_channel_header(w, ch, le, COMPRESSED_REVISION)?;
     }
 
     // 3. Foreign data section (empty).
@@ -320,10 +329,33 @@ fn write_post4_graph_header<W: Write>(
 }
 
 // ---------------------------------------------------------------------------
-// Channel header (86 bytes)
+// Channel header (252 bytes, V_20a base layout)
 // ---------------------------------------------------------------------------
 
-fn write_channel_header<W: Write>(w: &mut W, ch: &Channel, le: bool) -> Result<(), BiopacError> {
+/// Write a 252-byte channel header using the BIOPAC `V_20a` base layout.
+///
+/// Field offsets (byte positions within the 252-byte header):
+/// - 0:   `lChanHeaderLen` (i32) = 252
+/// - 4:   `nNum` (i16) = 0
+/// - 6:   `szCommentText` (40 bytes, null-padded ASCII channel name)
+/// - 46:  `notColor` (4 bytes) = 0
+/// - 50:  `nDispChan` (i16) = 0
+/// - 52:  `dVoltOffset` (f64) = 0.0
+/// - 60:  `dVoltScale` (f64) = 0.0
+/// - 68:  `szUnitsText` (20 bytes, null-padded ASCII units)
+/// - 88:  `lBufLength` (i32) = sample count
+/// - 92:  `dAmplScale` (f64) = amplitude scale factor
+/// - 100: `dAmplOffset` (f64) = amplitude offset
+/// - 108: `nChanOrder` (i16) = 0
+/// - 110: `nDispSize` (i16) = 0
+/// - 152: `nVarSampleDivider` (i16, Post-4 only)
+/// - 250: `nVarSampleDivider` (i16, Pre-4 `V_30r+` only, revision ≥ 44)
+fn write_channel_header<W: Write>(
+    w: &mut W,
+    ch: &Channel,
+    le: bool,
+    revision: i32,
+) -> Result<(), BiopacError> {
     let mut buf = [0u8; CHAN_HDR_LEN];
 
     let chan_hdr_len = i32::try_from(CHAN_HDR_LEN).unwrap_or(i32::MAX);
@@ -333,28 +365,43 @@ fn write_channel_header<W: Write>(w: &mut W, ch: &Channel, le: bool) -> Result<(
     let (scale, offset_val) = channel_calibration(ch);
     let var_sample_divider = i16::try_from(ch.frequency_divider).unwrap_or(i16::MAX);
 
-    put_i32(&mut buf, 0, chan_hdr_len, le); // lChanHeaderLen
-    put_i32(&mut buf, 4, sample_count, le); // lBufLength
-    put_f64(&mut buf, 8, scale, le); // dAmplScale
-    put_f64(&mut buf, 16, offset_val, le); // dAmplOffset
-    put_i16(&mut buf, 24, var_sample_divider, le); // nVarSampleDivider
-
-    // szCommentText: 40 bytes, null-padded ASCII (offset 26).
+    // offset 0: lChanHeaderLen = 252
+    put_i32(&mut buf, 0, chan_hdr_len, le);
+    // offset 4: nNum = 0 (already zero)
+    // offset 6: szCommentText (channel name, 40 bytes null-padded)
     let name_bytes = ch.name.as_bytes();
     let name_len = name_bytes.len().min(39);
-    if let (Some(dst), Some(src)) = (buf.get_mut(26..26 + name_len), name_bytes.get(..name_len)) {
+    if let (Some(dst), Some(src)) = (buf.get_mut(6..6 + name_len), name_bytes.get(..name_len)) {
         dst.copy_from_slice(src);
     }
-
-    // szUnitsText: 20 bytes, null-padded ASCII (offset 66).
+    // offset 46-51: notColor (4 bytes) + nDispChan (2 bytes) = 0 (already zero)
+    // offset 52: dVoltOffset = 0.0 (already zero)
+    // offset 60: dVoltScale = 0.0 (already zero)
+    // offset 68: szUnitsText (units label, 20 bytes null-padded)
     let units_bytes = ch.units.as_bytes();
     let units_len = units_bytes.len().min(19);
     if let (Some(dst), Some(src)) = (
-        buf.get_mut(66..66 + units_len),
+        buf.get_mut(68..68 + units_len),
         units_bytes.get(..units_len),
     ) {
         dst.copy_from_slice(src);
     }
+    // offset 88: lBufLength = sample count
+    put_i32(&mut buf, 88, sample_count, le);
+    // offset 92: dAmplScale
+    put_f64(&mut buf, 92, scale, le);
+    // offset 100: dAmplOffset
+    put_f64(&mut buf, 100, offset_val, le);
+    // offset 108-111: nChanOrder + nDispSize = 0 (already zero)
+    // nVarSampleDivider at version-dependent offset:
+    if revision >= REVISION_POST4 {
+        // Post-4 (V_400B+): offset 152
+        put_i16(&mut buf, 152, var_sample_divider, le);
+    } else if revision >= REVISION_V30R {
+        // Pre-4 V_30r+ (revision ≥ 44): offset 250
+        put_i16(&mut buf, 250, var_sample_divider, le);
+    }
+    // Pre-4 revision < 44: no nVarSampleDivider; reader defaults to 1.
 
     w.write_all(&buf).map_err(BiopacError::Io)
 }

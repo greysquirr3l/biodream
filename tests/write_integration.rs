@@ -83,7 +83,9 @@ fn write_to_bytes_with(
 #[test]
 fn write_roundtrip_basic() -> Result<(), Box<dyn std::error::Error>> {
     let original = two_channel_datafile();
-    let bytes = write_to_bytes(&original)?;
+    // Revision 44 (REVISION_V30R) is required to round-trip frequency_divider > 1
+    // in the Pre-4 uncompressed format (nVarSampleDivider written at offset 250).
+    let bytes = write_to_bytes_with(&original, &WriteOptions::new().revision(44))?;
 
     let parsed = ReadOptions::new().read_bytes(&bytes)?.into_value();
 
@@ -450,7 +452,9 @@ fn write_compressed_smaller_than_uncompressed() -> Result<(), Box<dyn std::error
 fn write_compressed_data_matches_uncompressed() -> Result<(), Box<dyn std::error::Error>> {
     let df = two_channel_datafile();
 
-    let uncompressed_bytes = write_to_bytes(&df)?;
+    // Revision 44 is needed so nVarSampleDivider is written and read back
+    // correctly for the mixed-rate RESP channel (frequency_divider = 2).
+    let uncompressed_bytes = write_to_bytes_with(&df, &WriteOptions::new().revision(44))?;
     let compressed_bytes = write_to_bytes_with(&df, &WriteOptions::new().compressed(true))?;
 
     let plain = ReadOptions::new()
@@ -547,9 +551,9 @@ fn write_interleave_byte_layout() -> Result<(), Box<dyn std::error::Error>> {
     let bytes = write_to_bytes(&df)?;
 
     // The interleaved data starts after:
-    //   256 (graph hdr) + 2×86 (channel hdrs) + 4 (foreign) + 2×4 (dtypes)
-    //   = 256 + 172 + 4 + 8 = 440 bytes
-    let data_start = 440usize;
+    //   256 (graph hdr) + 2×252 (channel hdrs) + 4 (foreign) + 2×4 (dtypes)
+    //   = 256 + 504 + 4 + 8 = 772 bytes
+    let data_start = 772usize;
     let data_bytes = bytes
         .get(data_start..)
         .ok_or("bytes must be long enough for data section")?;
@@ -604,8 +608,8 @@ fn write_marker_section_unit() -> Result<(), Box<dyn std::error::Error>> {
     let bytes = write_to_bytes(&df)?;
 
     // Marker section starts after:
-    //   256 (graph) + 86 (chan hdr) + 4 (foreign) + 4 (dtype) + 1×2 (i16 data) = 352 bytes
-    let data_end = 256 + 86 + 4 + 4 + 2; // = 352
+    //   256 (graph) + 252 (chan hdr) + 4 (foreign) + 4 (dtype) + 1×2 (i16 data) = 518 bytes
+    let data_end = 256 + 252 + 4 + 4 + 2; // = 518
     let marker_start = data_end;
     let marker_bytes = bytes
         .get(marker_start..)
@@ -746,7 +750,8 @@ fn datafile_mutation_then_write_roundtrip() -> Result<(), Box<dyn std::error::Er
     df.set_journal("Modified recording");
 
     // Write and read back.
-    let bytes = write_to_bytes(&df)?;
+    // Revision 44 is required to preserve frequency_divider = 2 for RESP (nVarSampleDivider).
+    let bytes = write_to_bytes_with(&df, &WriteOptions::new().revision(44))?;
     let parsed = ReadOptions::new().read_bytes(&bytes)?.into_value();
 
     // Verify modified channel.

@@ -200,8 +200,8 @@ fn fixture_multichannel_v43() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn fixture_mixed_rate_v43() -> Result<(), Box<dyn std::error::Error>> {
-    let (df, sidecar) = load_fixture("mixed_rate_v43")?;
+fn fixture_mixed_rate_v44() -> Result<(), Box<dyn std::error::Error>> {
+    let (df, sidecar) = load_fixture("mixed_rate_v44")?;
     assert_metadata(&df, &sidecar)?;
     assert_channels(&df, &sidecar)?;
     assert_markers(&df, &sidecar)?;

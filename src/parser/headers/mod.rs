@@ -20,7 +20,7 @@
 use alloc::vec::Vec;
 use std::io::{Read, Seek, SeekFrom};
 
-use binrw::BinRead;
+use binrw::{BinRead, Endian};
 
 use crate::{
     domain::{ChannelMetadata, GraphMetadata},
@@ -34,11 +34,13 @@ pub mod dtype;
 pub mod foreign;
 pub mod graph;
 
-use channel::{CHANNEL_HEADER_MIN_LEN, ChannelHeaderRaw, parse_channel_metadata};
+use channel::{ChannelHeaderRaw, parse_channel_metadata};
 use dtype::{ChannelDtypeRaw, parse_sample_type};
 use foreign::ForeignDataRaw;
-use graph::{GraphHeaderPost4Raw, GraphHeaderPre4Raw};
-use graph::{REVISION_POST4, detect_byte_order, parse_graph_header_post4, parse_graph_header_pre4};
+use graph::{
+    GraphHeaderPost4Raw, GraphHeaderPre4Raw, REVISION_POST4, detect_byte_order,
+    parse_graph_header_post4, parse_graph_header_pre4,
+};
 
 // ---------------------------------------------------------------------------
 // Output type
@@ -97,6 +99,21 @@ const CHAN_DESC_OFFSET: u64 = 128;
 const CHAN_DESC_MIN_LEN: i32 = 168;
 
 // ---------------------------------------------------------------------------
+// nVarSampleDivider offset constants
+// ---------------------------------------------------------------------------
+
+/// Byte offset of `nVarSampleDivider` within a Post-4 channel header (`V_400B+`).
+const CHAN_VAR_SAMPLE_POST4_OFFSET: u64 = 152;
+/// Minimum channel header length to contain `nVarSampleDivider` in Post-4 files.
+const CHAN_VAR_SAMPLE_POST4_MIN_LEN: i32 = 154;
+/// Byte offset of `nVarSampleDivider` within a Pre-4 channel header (`V_30r+`).
+const CHAN_VAR_SAMPLE_PRE4_OFFSET: u64 = 250;
+/// Minimum channel header length to contain `nVarSampleDivider` in Pre-4 files.
+const CHAN_VAR_SAMPLE_PRE4_MIN_LEN: i32 = 252;
+/// Minimum Pre-4 revision at which `nVarSampleDivider` is present (`V_30r = 44`).
+const REVISION_V30R: i32 = 44;
+
+// ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
 
@@ -112,77 +129,43 @@ pub(crate) fn parse_headers<R: Read + Seek>(reader: &mut R) -> Result<ParsedHead
     let pos = reader.stream_position().map_err(BiopacError::Io)?;
 
     // --- 2. Read graph header (version-dispatched) --------------------------
-    let (graph_metadata, graph_header_len, pre4_chan_header_len) = if version < REVISION_POST4 {
-        let raw = GraphHeaderPre4Raw::read_options(reader, endian, ())
-            .map_err(|e| binrw_to_parse_error(&e, pos, "graph header (Pre-4)"))?;
-        let parsed = parse_graph_header_pre4(raw, endian)?;
-        (
-            parsed.metadata,
-            parsed.graph_header_len,
-            Some(parsed.chan_header_len),
-        )
-    } else {
-        let raw = GraphHeaderPost4Raw::read_options(reader, endian, ())
-            .map_err(|e| binrw_to_parse_error(&e, pos, "graph header (Post-4)"))?;
-        let parsed = parse_graph_header_post4(raw, endian)?;
-        (parsed.metadata, parsed.graph_header_len, None)
-    };
+    let (graph_metadata, graph_header_len, pre4_chan_header_len, expected_padding_count) =
+        if version < REVISION_POST4 {
+            let raw = GraphHeaderPre4Raw::read_options(reader, endian, ())
+                .map_err(|e| binrw_to_parse_error(&e, pos, "graph header (Pre-4)"))?;
+            let parsed = parse_graph_header_pre4(raw, endian)?;
+            (
+                parsed.metadata,
+                parsed.graph_header_len,
+                Some(parsed.chan_header_len),
+                0u16,
+            )
+        } else {
+            let raw = GraphHeaderPost4Raw::read_options(reader, endian, ())
+                .map_err(|e| binrw_to_parse_error(&e, pos, "graph header (Post-4)"))?;
+            let parsed = parse_graph_header_post4(raw, endian)?;
+            (
+                parsed.metadata,
+                parsed.graph_header_len,
+                None,
+                parsed.expected_padding_count,
+            )
+        };
 
     // Seek past the rest of the graph header.
     reader
         .seek(SeekFrom::Start(graph_header_len))
         .map_err(BiopacError::Io)?;
 
+    skip_padding_blocks(reader, endian, expected_padding_count)?;
+
     // --- 3. Read per-channel headers ----------------------------------------
     let n_channels = usize::from(graph_metadata.channel_count);
     let mut channel_metadata = Vec::with_capacity(n_channels);
 
     for i in 0..n_channels {
-        let ch_start = reader.stream_position().map_err(BiopacError::Io)?;
-
-        let raw = ChannelHeaderRaw::read_options(reader, endian, ())
-            .map_err(|e| binrw_to_parse_error(&e, ch_start, "channel header"))?;
-
-        // For Pre-4, validate against the graph-header-declared length.
-        if let Some(expected_len) = pre4_chan_header_len {
-            if raw.chan_header_len < expected_len {
-                // emit a warning and use whatever the channel header claims
-            } else if raw.chan_header_len != expected_len {
-                // also tolerable; proceed with channel's own declared length
-                let _ = expected_len; // suppress unused variable
-            }
-        }
-
-        #[expect(
-            clippy::cast_sign_loss,
-            reason = "chan_header_len validated >= CHANNEL_HEADER_MIN_LEN in parse_channel_metadata"
-        )]
-        let ch_end = ch_start + (raw.chan_header_len.max(CHANNEL_HEADER_MIN_LEN) as u64);
-
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "channel index bounded by MAX_CHANNELS (256) validated in graph header"
-        )]
-        let mut meta = parse_channel_metadata(raw, i as u16, ch_start)?;
-
-        // Read extended description (`szDescriptionText`, 40 bytes at channel-
-        // relative offset 128) when the channel header is long enough (>= 168).
-        if raw.chan_header_len >= CHAN_DESC_MIN_LEN {
-            reader
-                .seek(SeekFrom::Start(ch_start + CHAN_DESC_OFFSET))
-                .map_err(BiopacError::Io)?;
-            let mut desc_buf = [0u8; 40];
-            reader.read_exact(&mut desc_buf).map_err(BiopacError::Io)?;
-            let end = desc_buf.iter().position(|&b| b == 0).unwrap_or(40);
-            meta.description =
-                alloc::string::String::from_utf8_lossy(desc_buf.get(..end).unwrap_or(&desc_buf))
-                    .into_owned();
-        }
+        let meta = read_single_channel_header(reader, endian, version, pre4_chan_header_len, i)?;
         channel_metadata.push(meta);
-
-        reader
-            .seek(SeekFrom::Start(ch_end))
-            .map_err(BiopacError::Io)?;
     }
 
     // --- 4. Read foreign data section ---------------------------------------
@@ -216,6 +199,131 @@ pub(crate) fn parse_headers<R: Read + Seek>(reader: &mut R) -> Result<ParsedHead
         data_start_offset,
         warnings,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+/// Skip `count` opaque `UnknownPaddingHeader` blocks (`AcqKnowledge` ≥ 4.3.0
+/// Post-4 big-endian files). Each block begins with an `i32` declaring its
+/// own total byte length.
+fn skip_padding_blocks<R: Read + Seek>(
+    reader: &mut R,
+    endian: Endian,
+    count: u16,
+) -> Result<(), BiopacError> {
+    for _ in 0..count {
+        let pad_start = reader.stream_position().map_err(BiopacError::Io)?;
+        let mut len_bytes = [0u8; 4];
+        reader.read_exact(&mut len_bytes).map_err(BiopacError::Io)?;
+        let pad_len = match endian {
+            Endian::Big => i32::from_be_bytes(len_bytes),
+            Endian::Little => i32::from_le_bytes(len_bytes),
+        };
+        // Clamp to at least 4 (the length field itself) to avoid seeking backward.
+        let skip = u64::try_from(pad_len).unwrap_or(40).max(4);
+        reader
+            .seek(SeekFrom::Start(pad_start + skip))
+            .map_err(BiopacError::Io)?;
+    }
+    Ok(())
+}
+
+/// Read `nVarSampleDivider` from its version-dependent byte offset within the
+/// channel header. Returns `1` when the field is absent for this format
+/// version.
+fn read_var_sample_divider<R: Read + Seek>(
+    reader: &mut R,
+    endian: Endian,
+    version: i32,
+    raw: &ChannelHeaderRaw,
+    ch_start: u64,
+) -> Result<i16, BiopacError> {
+    if version >= REVISION_POST4 && raw.chan_header_len >= CHAN_VAR_SAMPLE_POST4_MIN_LEN {
+        reader
+            .seek(SeekFrom::Start(ch_start + CHAN_VAR_SAMPLE_POST4_OFFSET))
+            .map_err(BiopacError::Io)?;
+        let mut vsd = [0u8; 2];
+        reader.read_exact(&mut vsd).map_err(BiopacError::Io)?;
+        Ok(match endian {
+            Endian::Big => i16::from_be_bytes(vsd),
+            Endian::Little => i16::from_le_bytes(vsd),
+        })
+    } else if version >= REVISION_V30R && raw.chan_header_len >= CHAN_VAR_SAMPLE_PRE4_MIN_LEN {
+        reader
+            .seek(SeekFrom::Start(ch_start + CHAN_VAR_SAMPLE_PRE4_OFFSET))
+            .map_err(BiopacError::Io)?;
+        let mut vsd = [0u8; 2];
+        reader.read_exact(&mut vsd).map_err(BiopacError::Io)?;
+        Ok(match endian {
+            Endian::Big => i16::from_be_bytes(vsd),
+            Endian::Little => i16::from_le_bytes(vsd),
+        })
+    } else {
+        Ok(1i16)
+    }
+}
+
+/// Parse one channel-header entry: read the raw struct, read the
+/// var-sample divider and optional extended description, then advance the
+/// reader to the start of the next channel header.
+fn read_single_channel_header<R: Read + Seek>(
+    reader: &mut R,
+    endian: Endian,
+    version: i32,
+    pre4_chan_header_len: Option<i32>,
+    index: usize,
+) -> Result<ChannelMetadata, BiopacError> {
+    let ch_start = reader.stream_position().map_err(BiopacError::Io)?;
+
+    let raw = ChannelHeaderRaw::read_options(reader, endian, ())
+        .map_err(|e| binrw_to_parse_error(&e, ch_start, "channel header"))?;
+
+    // For Pre-4, validate against the graph-header-declared length.
+    if let Some(expected_len) = pre4_chan_header_len {
+        if raw.chan_header_len < expected_len {
+            // emit a warning and use whatever the channel header claims
+        } else if raw.chan_header_len != expected_len {
+            // also tolerable; proceed with channel's own declared length
+            let _ = expected_len;
+        }
+    }
+
+    let var_sample_divider = read_var_sample_divider(reader, endian, version, &raw, ch_start)?;
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "channel index bounded by MAX_CHANNELS (256) validated in graph header"
+    )]
+    let mut meta = parse_channel_metadata(raw, var_sample_divider, index as u16, ch_start)?;
+
+    // ch_end is safe to compute after parse_channel_metadata validates
+    // that chan_header_len >= CHANNEL_HEADER_MIN_LEN (no negative values).
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "chan_header_len validated >= CHANNEL_HEADER_MIN_LEN by parse_channel_metadata"
+    )]
+    let ch_end = ch_start + raw.chan_header_len as u64;
+
+    // Read extended description (`szDescriptionText`, 40 bytes at channel-
+    // relative offset 128) when the channel header is long enough (>= 168).
+    if raw.chan_header_len >= CHAN_DESC_MIN_LEN {
+        reader
+            .seek(SeekFrom::Start(ch_start + CHAN_DESC_OFFSET))
+            .map_err(BiopacError::Io)?;
+        let mut desc_buf = [0u8; 40];
+        reader.read_exact(&mut desc_buf).map_err(BiopacError::Io)?;
+        let end = desc_buf.iter().position(|&b| b == 0).unwrap_or(40);
+        meta.description =
+            alloc::string::String::from_utf8_lossy(desc_buf.get(..end).unwrap_or(&desc_buf))
+                .into_owned();
+    }
+
+    reader
+        .seek(SeekFrom::Start(ch_end))
+        .map_err(BiopacError::Io)?;
+    Ok(meta)
 }
 
 // ---------------------------------------------------------------------------
@@ -272,19 +380,24 @@ mod tests {
         for i in 0..n_channels {
             let mut ch = [0u8; 252];
             ch[0..4].copy_from_slice(&252i32.to_le_bytes()); // lChanHeaderLen
-            ch[4..8].copy_from_slice(&1000i32.to_le_bytes()); // lBufLength
-            ch[8..16].copy_from_slice(&1.0f64.to_le_bytes()); // dAmplScale
-            ch[16..24].copy_from_slice(&0.0f64.to_le_bytes()); // dAmplOffset
-            ch[24..26].copy_from_slice(&1i16.to_le_bytes()); // nVarSampleDivider
-            // szCommentText: "CH0", "CH1", ...
+            // offset 4-5: nNum = 0
+            // szCommentText: "CH0", "CH1", ... at offset 6
             let name = alloc::format!("CH{i}");
             let name_bytes = name.as_bytes();
             let copy_len = name_bytes.len().min(39);
-            ch[26..26 + copy_len].copy_from_slice(&name_bytes[..copy_len]);
+            ch[6..6 + copy_len].copy_from_slice(&name_bytes[..copy_len]);
+            // offset 88: lBufLength
+            ch[88..92].copy_from_slice(&1000i32.to_le_bytes());
+            // offset 92: dAmplScale
+            ch[92..100].copy_from_slice(&1.0f64.to_le_bytes());
+            // offset 100: dAmplOffset
+            ch[100..108].copy_from_slice(&0.0f64.to_le_bytes());
+            // nVarSampleDivider is at offset 250 for Pre-4 V_30r (rev >= 44);
+            // version 38 < 44, so it defaults to 1 in parse_headers.
             buf.extend_from_slice(&ch);
         }
 
-        // --- Foreign data (4-byte nLength=0) ---
+        // --- Foreign data (4 bytes: nLength = 0) ---
         buf.extend_from_slice(&0i32.to_le_bytes());
 
         // --- Dtype headers (4 bytes each: nSize=4, nType=2 for i16) ---
@@ -378,12 +491,15 @@ mod tests {
         // --- Channel header (252 bytes) ---
         let mut ch = [0u8; 252];
         ch[0..4].copy_from_slice(&chan_header_len.to_le_bytes());
-        ch[4..8].copy_from_slice(&1000i32.to_le_bytes());
-        ch[8..16].copy_from_slice(&1.0f64.to_le_bytes());
-        ch[16..24].copy_from_slice(&0.0f64.to_le_bytes());
-        ch[24..26].copy_from_slice(&1i16.to_le_bytes());
-        // szCommentText at 26: "ECG"
-        ch[26..29].copy_from_slice(b"ECG");
+        // offset 4-5: nNum = 0
+        // szCommentText: "ECG" at offset 6
+        ch[6..9].copy_from_slice(b"ECG");
+        // offset 88: lBufLength
+        ch[88..92].copy_from_slice(&1000i32.to_le_bytes());
+        // offset 92: dAmplScale
+        ch[92..100].copy_from_slice(&1.0f64.to_le_bytes());
+        // offset 100: dAmplOffset
+        ch[100..108].copy_from_slice(&0.0f64.to_le_bytes());
         // szDescriptionText at 128 (40 bytes)
         let desc_bytes = description.as_bytes();
         let copy_len = desc_bytes.len().min(39);

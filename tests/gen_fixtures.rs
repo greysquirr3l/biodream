@@ -187,9 +187,9 @@ fn multichannel_v43() -> (Datafile, WriteOptions) {
     (df, WriteOptions::new())
 }
 
-fn mixed_rate_v43() -> (Datafile, WriteOptions) {
+fn mixed_rate_v44() -> (Datafile, WriteOptions) {
     let df = Datafile {
-        metadata: meta(43, 2, 1000.0),
+        metadata: meta(44, 2, 1000.0),
         channels: vec![
             Channel {
                 name: String::from("ECG"),
@@ -211,7 +211,7 @@ fn mixed_rate_v43() -> (Datafile, WriteOptions) {
         markers: Vec::new(),
         journal: None,
     };
-    (df, WriteOptions::new())
+    (df, WriteOptions::new().revision(44))
 }
 
 fn compressed_v68() -> (Datafile, WriteOptions) {
@@ -333,8 +333,8 @@ fn gen_fixtures() -> Result<(), Box<dyn std::error::Error>> {
     let (df, opts) = multichannel_v43();
     write_fixture(&df, &opts, "multichannel_v43")?;
 
-    let (df, opts) = mixed_rate_v43();
-    write_fixture(&df, &opts, "mixed_rate_v43")?;
+    let (df, opts) = mixed_rate_v44();
+    write_fixture(&df, &opts, "mixed_rate_v44")?;
 
     let (df, opts) = compressed_v68();
     write_fixture(&df, &opts, "compressed_v68")?;
@@ -390,8 +390,8 @@ fn gen_roundtrip_multichannel_v43() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn gen_roundtrip_mixed_rate_v43() -> Result<(), Box<dyn std::error::Error>> {
-    let (df, opts) = mixed_rate_v43();
+fn gen_roundtrip_mixed_rate_v44() -> Result<(), Box<dyn std::error::Error>> {
+    let (df, opts) = mixed_rate_v44();
     let mut buf = Vec::new();
     opts.write_stream(&df, &mut buf)?;
     let parsed = ReadOptions::new().read_bytes(&buf)?.into_value();

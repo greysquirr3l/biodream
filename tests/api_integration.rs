@@ -75,43 +75,51 @@ fn build_pre4_acq(channels: usize, samples_per_channel: usize) -> Vec<u8> {
     assert_eq!(buf.len(), 256, "graph header must be 256 bytes");
 
     // -----------------------------------------------------------------------
-    // Per-channel headers (252 bytes each)
+    // Per-channel headers (252 bytes each, V_20a layout)
+    // Fields at correct byte offsets for the real BIOPAC format:
+    //   offset 0:   lChanHeaderLen (i32)
+    //   offset 4:   nNum (i16, zero)
+    //   offset 6:   szCommentText (40 bytes)  ← channel name
+    //   offset 46:  nNotColor (4 bytes, zero)
+    //   offset 50:  nDispChan (i16, zero)
+    //   offset 52:  dVoltOffset (f64, zero)
+    //   offset 60:  dVoltScale (f64, zero)
+    //   offset 68:  szUnitsText (20 bytes)
+    //   offset 88:  lBufLength (i32)
+    //   offset 92:  dAmplScale (f64)
+    //   offset 100: dAmplOffset (f64)
+    //   offset 108: nChanOrder (i16, zero)
+    //   offset 110: nDispSize (i16, zero)
+    //   [112..252]  zeros (pad to chan_hdr_len)
     // -----------------------------------------------------------------------
     for ch in 0..channels {
         let start = buf.len();
+        let mut ch_buf = [0u8; 252];
 
-        // [0..4]   lChanHeaderLen = 252
-        buf.extend_from_slice(&chan_hdr_len.to_le_bytes());
-        // [4..8]   lBufLength = n
-        buf.extend_from_slice(&i32::try_from(n).unwrap_or(0).to_le_bytes());
-        // [8..16]  dAmplScale = 1.0
-        buf.extend_from_slice(&1.0f64.to_le_bytes());
-        // [16..24] dAmplOffset = 0.0
-        buf.extend_from_slice(&0.0f64.to_le_bytes());
-        // [24..26] nVarSampleDivider = 1
-        buf.extend_from_slice(&1i16.to_le_bytes());
-
-        // [26..66] szCommentText (40 bytes, null-terminated channel name)
+        // offset 0: lChanHeaderLen = 252
+        ch_buf[0..4].copy_from_slice(&chan_hdr_len.to_le_bytes());
+        // offset 6: szCommentText (channel name)
         let name = format!("CH{ch}");
-        let mut name_bytes = [0u8; 40];
         let name_src = name.as_bytes();
         let len = name_src.len().min(39);
-        if let (Some(dst), Some(src)) = (name_bytes.get_mut(..len), name_src.get(..len)) {
+        if let (Some(dst), Some(src)) = (ch_buf.get_mut(6..6 + len), name_src.get(..len)) {
             dst.copy_from_slice(src);
         }
-        buf.extend_from_slice(&name_bytes);
-
-        // [66..86] szUnitsText (20 bytes)
-        let mut units_bytes = [0u8; 20];
-        if let Some(dst) = units_bytes.get_mut(..2) {
+        // offset 68: szUnitsText (2 bytes "mV", rest zero)
+        if let Some(dst) = ch_buf.get_mut(68..70) {
             dst.copy_from_slice(b"mV");
         }
-        buf.extend_from_slice(&units_bytes);
+        // offset 88: lBufLength = n
+        ch_buf[88..92].copy_from_slice(&i32::try_from(n).unwrap_or(0).to_le_bytes());
+        // offset 92: dAmplScale = 1.0
+        ch_buf[92..100].copy_from_slice(&1.0f64.to_le_bytes());
+        // offset 100: dAmplOffset = 0.0
+        ch_buf[100..108].copy_from_slice(&0.0f64.to_le_bytes());
+        // nVarSampleDivider: at offset 250 for Pre-4 V_30r (rev >= 44).
+        // lVersion = 38 < 44, so biodream defaults divider to 1.
+        ch_buf[250..252].copy_from_slice(&1i16.to_le_bytes());
 
-        // [86..252] pad to chan_hdr_len
-        let consumed = buf.len() - start;
-        let pad = chan_hdr_usize.saturating_sub(consumed);
-        buf.extend(std::iter::repeat_n(0u8, pad));
+        buf.extend_from_slice(&ch_buf);
 
         assert_eq!(
             buf.len() - start,

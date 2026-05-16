@@ -133,7 +133,7 @@ mod tests {
         reason = "test helper: channel count and header length are small known-bounded values"
     )]
     fn build_minimal_pre4(n_channels: usize) -> Vec<u8> {
-        let chan_hdr_len: usize = 86;
+        let chan_hdr_len: usize = 112;
         let mut buf: Vec<u8> = Vec::new();
 
         // Graph header (256 bytes)
@@ -147,20 +147,24 @@ mod tests {
         gh[252..254].copy_from_slice(&(chan_hdr_len as i16).to_le_bytes()); // nExtItemHeaderLen
         buf.extend_from_slice(&gh);
 
-        // Per-channel headers
+        // Per-channel headers (112 bytes each, V_20a layout)
         for i in 0..n_channels {
-            let mut ch = [0u8; 86];
+            let mut ch = [0u8; 112];
             ch[0..4].copy_from_slice(&(chan_hdr_len as i32).to_le_bytes()); // lChanHeaderLen
-            ch[4..8].copy_from_slice(&0i32.to_le_bytes()); // lBufLength = 0
-            ch[8..16].copy_from_slice(&1.0f64.to_le_bytes()); // dAmplScale
-            ch[16..24].copy_from_slice(&0.0f64.to_le_bytes()); // dAmplOffset
-            ch[24..26].copy_from_slice(&1i16.to_le_bytes()); // nVarSampleDivider
+            // offset 4-5: nNum = 0
+            // offset 6-45: szCommentText (channel name)
             let name = alloc::format!("CH{i}");
             let name_bytes = name.as_bytes();
             let len = name_bytes.len().min(39);
-            if let (Some(dst), Some(src)) = (ch.get_mut(26..26 + len), name_bytes.get(..len)) {
+            if let (Some(dst), Some(src)) = (ch.get_mut(6..6 + len), name_bytes.get(..len)) {
                 dst.copy_from_slice(src);
             }
+            // offset 88-91: lBufLength = 0
+            ch[88..92].copy_from_slice(&0i32.to_le_bytes());
+            // offset 92-99: dAmplScale = 1.0
+            ch[92..100].copy_from_slice(&1.0f64.to_le_bytes());
+            // offset 100-107: dAmplOffset = 0.0
+            ch[100..108].copy_from_slice(&0.0f64.to_le_bytes());
             buf.extend_from_slice(&ch);
         }
 

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-05-15
+
+### Fixed
+
+- **Parser**: corrected `ChannelHeaderRaw` binary layout for the V_20a
+  channel-header format. The struct previously placed `lBufLength`,
+  `dAmplScale`, `dAmplOffset`, and `nVarSampleDivider` at the wrong offsets;
+  the correct layout is: `szCommentText` at offset 6, `lBufLength` at 88,
+  `dAmplScale` at 92, `dAmplOffset` at 100 (total fixed region = 112 bytes).
+  `CHANNEL_HEADER_MIN_LEN` updated from 86 → 112.
+
+- **Parser**: added support for the `hExpectedPaddings` field in Post-4
+  graph headers (`AcqKnowledge` ≥ 4.3.0, file revision ≥ 124). Files from
+  BIOPAC hardware in big-endian mode include one or more 40-byte
+  `UnknownPaddingHeader` blocks between the graph header and the first
+  channel header. biodream previously read the first padding block as a
+  channel header, saw `lChanHeaderLen = 40 < 112`, and returned a parse
+  error. The parser now reads `hExpectedPaddings` from graph-header offset
+  2398 and skips that many padding blocks before reading channel headers.
+
+- **Parser**: `nVarSampleDivider` (per-channel variable sample divider) is
+  now read from its correct version-dependent offset instead of the
+  channel-header fixed struct: offset 152 for Post-4 files (revision ≥ 68,
+  channel header ≥ 154 bytes), offset 250 for Pre-4 files (revision ≥ 44,
+  channel header ≥ 252 bytes). Older files default to divider = 1.
+
 ## [0.2.2] - 2026-05-15
 
 ### Added
@@ -17,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--channels` (by name or 0-based index), and `--start`/`--end` time-window
   clipping. Gated behind the optional `plot` feature.
 
+### Changed
+
+- **Dependencies**: upgraded `arrow` and `parquet` from 54 → 58.
+
 ### Fixed
 
 - **CI**: Four clippy lint errors in `examples/write_file.rs`
@@ -24,9 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   were causing the `Lint` job to fail since the `write` feature was added.
 - **CI**: `build.rs` triggered `clippy::map_unwrap_or`; replaced
   `.map(…).unwrap_or(false)` with `is_ok_and(…)`.
-- **CI**: Removed stale `RUSTSEC-2024-0436` ignore from `deny.toml` — arrow 58
-  no longer pulls in `paste` via `ahash`, so the entry caused a
-  `warning[advisory-not-detected]` in `cargo-deny`.
+- **CI**: Restored `RUSTSEC-2024-0436` advisory ignore in `deny.toml` that
+  was inadvertently dropped during the arrow/parquet 54 → 58 upgrade; `paste
+  1.0.15` remains a transitive dependency via `parquet` and has no patched
+  version available.
+- **Packaging**: excluded `.mcp.json`, `.vscode/`, `.github/`, `deny.toml`,
+  `plan.toml`, `docs/`, and `reference_projects/` from the crates.io package
+  manifest to prevent publish failures caused by dangling symlinks in the
+  working tree.
 
 ## [0.2.1] - 2026-05-15
 
