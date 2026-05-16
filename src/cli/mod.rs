@@ -9,6 +9,8 @@ mod inspect;
 mod markers;
 #[cfg(feature = "plot")]
 mod plot;
+#[cfg(feature = "physio")]
+mod signals;
 
 use clap::{Parser, Subcommand};
 
@@ -18,6 +20,8 @@ use inspect::InspectArgs;
 use markers::MarkersArgs;
 #[cfg(feature = "plot")]
 use plot::PlotArgs;
+#[cfg(feature = "physio")]
+use signals::SignalsArgs;
 
 // ---------------------------------------------------------------------------
 // Top-level CLI struct
@@ -61,6 +65,10 @@ enum Command {
     /// Show low-level binary layout diagnostics.
     Inspect(InspectArgs),
 
+    /// Detect physiological signals: R-peaks, PTT, heart rate. Requires the `physio` feature.
+    #[cfg(feature = "physio")]
+    Signals(SignalsArgs),
+
     /// Render channel waveforms as a PNG or SVG image.
     #[cfg(feature = "plot")]
     Plot(PlotArgs),
@@ -78,6 +86,8 @@ pub fn run() -> anyhow::Result<()> {
         Command::Convert(args) => convert::run(args),
         Command::Markers(args) => markers::run(&args),
         Command::Inspect(args) => inspect::run(&args),
+        #[cfg(feature = "physio")]
+        Command::Signals(args) => signals::run(&args),
         #[cfg(feature = "plot")]
         Command::Plot(args) => plot::run(&args),
     }

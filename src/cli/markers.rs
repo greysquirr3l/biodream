@@ -36,12 +36,24 @@ pub fn run_inner(
     json: bool,
     writer: &mut impl Write,
 ) -> anyhow::Result<()> {
-    let result = super::info::read_acq(path)?;
-    let df = &result.value;
+    // Markers are available from the lazy-loaded headers — no sample data needed.
+    if path == std::path::Path::new("-") {
+        let result = super::info::read_acq(path)?;
+        print_markers(&result.value.markers, json, writer)
+    } else {
+        let lazy = biodream::open_file(path)
+            .with_context(|| format!("failed to open {}", path.display()))?;
+        print_markers(&lazy.markers, json, writer)
+    }
+}
 
+fn print_markers(
+    markers: &[biodream::Marker],
+    json: bool,
+    writer: &mut impl Write,
+) -> anyhow::Result<()> {
     if json {
-        let rows: Vec<serde_json::Value> = df
-            .markers
+        let rows: Vec<serde_json::Value> = markers
             .iter()
             .enumerate()
             .map(|(i, m)| {
@@ -59,7 +71,7 @@ pub fn run_inner(
         writeln!(writer).context("write failed")?;
     } else {
         writeln!(writer, "sample\tlabel\tchannel\tstyle").context("write failed")?;
-        for m in &df.markers {
+        for m in markers {
             let channel_str = m
                 .channel
                 .map_or_else(|| String::from("-"), |c| c.to_string());
