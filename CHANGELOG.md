@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-05-16
+
+### Fixed
+
+- **Parser**: corrected foreign data section length interpretation for Post-4
+  files. The `lLength` field in `ForeignDataRaw` is the **total** byte count
+  of the section (including the 4-byte `lLength` field itself), not the
+  payload byte count. biodream was reading `lLength` bytes as payload and then
+  consuming the 4-byte field on top, overreading by 4 bytes. For a typical
+  Post-4 big-endian file (`lLength = 8`), this shifted every subsequent dtype
+  header by 4 bytes, causing channel 5's dtype to be read from garbage data
+  (`nType = 456` instead of `nType = 1`, f64). The payload count is now
+  computed as `(n_length - 4).max(0)`.
+
 ## [0.2.3] - 2026-05-15
 
 ### Fixed
