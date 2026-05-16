@@ -1,7 +1,7 @@
 # biodream
 
 [![CI](https://github.com/greysquirr3l/biodream/actions/workflows/ci.yml/badge.svg)](https://github.com/greysquirr3l/biodream/actions/workflows/ci.yml)
-[![crates.io](https://img.shields.io/crates/v/biodream.svg)](https://crates.io/crates/biodream)
+[![crates.io](https://img.shields.io/crates/v/biodream)](https://crates.io/crates/biodream)
 [![docs.rs](https://docs.rs/biodream/badge.svg)](https://docs.rs/biodream)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
@@ -33,14 +33,14 @@ event markers, journals, and foreign data sections.
 
 ```toml
 [dependencies]
-biodream = "0.1"
+biodream = "0.2.7"
 ```
 
 With optional features:
 
 ```toml
 [dependencies]
-biodream = { version = "0.1", features = ["arrow", "parquet", "write"] }
+biodream = { version = "0.2.7", features = ["arrow", "parquet", "write"] }
 ```
 
 ## Feature flags
@@ -84,7 +84,7 @@ The core parser (`domain` and `error` modules) compiles under `#![no_std]` with
 
 ```toml
 [dependencies]
-biodream = { version = "0.1", default-features = false }
+biodream = { version = "0.2.7", default-features = false }
 ```
 
 I/O adapters (`read`, `write`, export targets) require `std`.
