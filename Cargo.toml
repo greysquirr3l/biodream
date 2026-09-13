@@ -57,7 +57,7 @@ default = ["read", "csv"]
 
 [dependencies]
 # Binary parsing — no_std compatible when default-features = false.
-binrw = { version = "0.14", default-features = false }
+binrw = { version = "0.15", default-features = false }
 
 # Error handling — no_std compatible when default-features = false.
 thiserror = { version = "2.0", default-features = false }
