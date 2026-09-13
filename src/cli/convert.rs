@@ -215,10 +215,7 @@ fn parse_delimiter(s: &str) -> anyhow::Result<u8> {
     let mut chars = s.chars();
     match (chars.next(), chars.next()) {
         (Some(c), None) if c.is_ascii() => Ok(c as u8),
-        _ => anyhow::bail!(
-            "--delimiter must be a single ASCII character or 'tab'; got {:?}",
-            s
-        ),
+        _ => anyhow::bail!("--delimiter must be a single ASCII character or 'tab'; got {s:?}"),
     }
 }
 
