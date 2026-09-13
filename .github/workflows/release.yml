@@ -43,7 +43,7 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
       sha: ${{ steps.tag.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -161,7 +161,7 @@ jobs:
             bin: biopac.exe
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.resolve-tag.outputs.sha }}
 
@@ -208,7 +208,7 @@ jobs:
     needs: [resolve-tag, verify-ci]
     if: ${{ needs.resolve-tag.outputs.should_release == 'true' && needs.resolve-tag.outputs.tag != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.resolve-tag.outputs.sha }}
 
