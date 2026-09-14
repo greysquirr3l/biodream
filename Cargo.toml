@@ -77,7 +77,7 @@ arrow-schema = { version = "58", optional = true }
 arrow-ipc = { version = "58", optional = true }
 
 # Parquet export.
-parquet = { version = "58", optional = true }
+parquet = { version = "59", optional = true }
 
 # HDF5 export.
 hdf5 = { version = "0.8", optional = true }
